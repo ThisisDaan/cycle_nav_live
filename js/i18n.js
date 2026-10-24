@@ -133,6 +133,8 @@ const NL = {
 
   // planning
   'Waiting for your location…': 'Wachten op je locatie…',
+  'Following you': 'Je wordt gevolgd',
+  'Following you, heading up': 'Je wordt gevolgd, rijrichting boven',
   'Start and destination are the same place.': 'Start en bestemming zijn dezelfde plek.',
   'Updating your route…': 'Je route bijwerken…',
   'Finding calm routes…': 'Rustige routes zoeken…',

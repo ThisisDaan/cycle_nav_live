@@ -41,6 +41,13 @@ let wxAdvice = null, wxToken = 0, wxAt = 0, wxTimer = 0;   // ride weather advic
 const wxOn = () => S().wx !== false;
 let userRot = 0;             // planner rotation chosen by two-finger twist
 let rotFrameTimer = 0;
+// Follow mode outside navigation: 0 off, 1 follow north-up, 2 follow with heading up.
+const LOCATE_ICONS = {
+  0: '<path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/>',
+  1: '<path fill="currentColor" d="M12 6a6 6 0 1 0 0 12 6 6 0 0 0 0-12zm8.94 5A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/>',
+  2: '<path fill="currentColor" d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/>',
+};
+const fol = { mode: 0, paused: false, resume: 1, heading: 2, course: null, fastSince: 0, touched: 0, userZoom: null, wantZoom: null, toasted: false };
 let locked = false;          // lock mode: an overlay swallows every touch
 const TILT = 50;             // degrees the map is tipped back in the 3D view
 const landscapeMQ = matchMedia('(orientation: landscape) and (max-height: 500px)');
@@ -92,6 +99,7 @@ L.Map.prototype.mouseEventToContainerPoint = function (e) {
 // A programmatic fit in the planner assumes a north-up screen-sized map.
 const fitBounds = L.Map.prototype.fitBounds;
 L.Map.prototype.fitBounds = function (...args) {
+  if (!nav) stopFollow(true);
   if (!nav && document.body.classList.contains('rot-frame')) resetNorth(true);
   return fitBounds.apply(this, args);
 };
@@ -245,6 +253,7 @@ function setupMap() {
   map.on('moveend', planRecenter);
   map.on('dragstart', () => {
     if (nav) { nav.follow = false; clearTimeout(recenterTimer); $('#recenterBtn').hidden = false; }
+    else if (fol.mode && !fol.paused) pauseFollow();
     else if (options.length) setSheetCollapsed(true);
   });
   // After looking around, snap back to your position by itself.
@@ -255,7 +264,10 @@ function setupMap() {
     syncGL();
     // A pinch while following sets your own zoom level for the rest of the ride.
     if (nav?.follow && nav.wantZoom != null && Math.abs(map.getZoom() - nav.wantZoom) > 0.05) nav.userZoom = map.getZoom();
+    if (!nav && fol.mode && !fol.paused && fol.wantZoom != null && Math.abs(map.getZoom() - fol.wantZoom) > 0.05) fol.userZoom = map.getZoom();
   });
+  addEventListener('touchstart', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, { capture: true, passive: true });
+  addEventListener('mousedown', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, true);
   setupTwist();
   map.on('click', () => { hideSuggestions(); $('#bikeMenu').hidden = true; });
   map.on('contextmenu', e => !picking && dropPin([e.latlng.lat, e.latlng.lng]));
@@ -375,6 +387,7 @@ function rotTick() {
 
 async function dropPin(latlng) {
   if (nav) return;
+  if (fol.mode && !fol.paused) pauseFollow();
   // start · via · end, in the order you'd plan a ride
   const html = name => `<div class="map-popup"><b class="selectable">${esc(name)}</b><button data-a="from">Directions from here</button>${
     options.length ? '<button data-a="via">Go via here</button>' : ''}<button class="go" data-a="to">Directions to here</button><button data-a="pin">${BOOKMARK_SVG} Save as pin</button></div>`;
@@ -455,6 +468,83 @@ function handleFix(fix) {
   if (first && !S().view && !nav) map.setView(fix.latlng, 15);
   if (pendingPlan) { pendingPlan = false; planRoute(); }
   if (nav) onNavFix(fix);
+  else followStep(fix);
+}
+
+// ---- follow mode (no navigation): the map keeps you centred, like Google Maps
+
+function updateLocateBtn() {
+  const m = fol.paused ? 0 : fol.mode, b = $('#locateBtn');
+  b.querySelector('svg').innerHTML = LOCATE_ICONS[m];
+  b.classList.toggle('active', m > 0);
+  const label = t(['Centre on me', 'Following you', 'Following you, heading up'][m]);
+  b.title = label; b.setAttribute('aria-label', label);
+}
+
+function setFollow(mode) {
+  if (nav) return;
+  const was = fol.paused ? 0 : fol.mode;
+  fol.mode = mode; fol.paused = false;
+  if (mode) { fol.resume = fol.heading = mode; }
+  if (mode === 2) {
+    fol.course = currentHeading() ?? fol.course;
+    setRotFrame(true);
+  } else if (was === 2 || userRot) resetNorth();
+  updateLocateBtn();
+  if (mode) { $('#recenterBtn').hidden = true; fol.userZoom = null; if (me) followStep(me, true); }
+  else planRecenter();
+}
+
+function pauseFollow() {
+  fol.paused = true;
+  if (fol.mode === 2) userRot = mapRotation;
+  updateLocateBtn();
+  $('#recenterBtn').hidden = false;
+}
+
+function stopFollow(instant) {
+  if (!fol.mode && !fol.paused) return;
+  const was = fol.mode;
+  fol.mode = 0; fol.paused = false;
+  if (was === 2 && !instant) resetNorth();
+  updateLocateBtn();
+  planRecenter();
+}
+
+function folHeading() {
+  const moving = me?.speed != null && me.speed > 1.5;
+  return moving && fol.course != null ? fol.course : (compass ?? fol.course);
+}
+
+function followStep(fix, force) {
+  const now = Date.now(), kmh = (fix.speed ?? 0) * 3.6;
+  if (fix.heading != null && (fix.speed == null || fix.speed > 1.5)) {
+    fol.course = fol.course == null ? fix.heading : (fol.course + angleDelta(fol.course, fix.heading) * 0.6 + 360) % 360;
+  }
+  // riding along at a decent pace without having touched the map: start following by itself
+  fol.fastSince = kmh > 8 ? (fol.fastSince || now) : 0;
+  if ((!fol.mode || fol.paused) && fol.fastSince && now - fol.fastSince > 10000 && now - fol.touched > 30000
+      && !options.length && !to && !picking && $('#sheet').hidden) {
+    setFollow(fol.heading || 2);
+    if (!fol.toasted) { fol.toasted = true; toast('Following you'); }
+    return;
+  }
+  if (!fol.mode || fol.paused) return;
+  if (fol.mode === 2) rotateMap();
+  let z = fol.userZoom ?? map.getZoom();
+  if (fol.userZoom == null) {
+    if (fix.speed != null && fix.speed > 1.5) {
+      z = kmh < 12 ? 17.25 : kmh < 22 ? 16.75 : 16.25;
+      if (Math.abs(z - map.getZoom()) < 0.3) z = map.getZoom();
+    } else if (force) z = Math.max(z, 16);
+  }
+  fol.wantZoom = z;
+  let c = fix.latlng;
+  if (fol.mode === 2) { // rider at about 60% of the height: more road ahead
+    const a = mapRotation * Math.PI / 180, d = innerHeight * 0.1;
+    c = map.unproject(map.project(c, z).subtract(L.point(-d * Math.sin(a), d * Math.cos(a))), z);
+  }
+  map.setView(c, z, { animate: true, pan: { duration: meGlide.ms / 1000, easeLinearity: 1 } });
 }
 
 // Compass: the marker turns with the phone. While riding faster than walking
@@ -499,6 +589,7 @@ function applyHeading() {
   shownRotation += angleDelta(shownRotation, h);
   el.style.transform = `rotate(${shownRotation}deg)`;
   if (nav && S().orientation === 'compass') rotateMap();
+  else if (!nav && fol.mode === 2 && !fol.paused && !(me?.speed > 1.5)) rotateMap();
 }
 
 function meIconHtml() {
@@ -536,7 +627,7 @@ function drawMe(rebuild = false) {
 
 function planRecenter() {
   if (nav) return;
-  const off = !!me && !map.getBounds().pad(-0.1).contains(me.latlng) && $('#sheet').hidden;
+  const off = !!me && $('#sheet').hidden && (fol.paused || (!fol.mode && !map.getBounds().pad(-0.1).contains(me.latlng)));
   $('#recenterBtn').hidden = !off;
 }
 
@@ -697,6 +788,7 @@ function resolve(place) { return place?.isMe ? me?.latlng : place?.latlng; }
 // ---------------------------------------------------------------- routing
 
 async function planRoute({ fit = true } = {}) {
+  stopFollow(true);
   scheduleSession();
   if (!to) return;
   const a = resolve(from), b = resolve(to);
@@ -1302,9 +1394,12 @@ function setupButtons() {
   $('#stopBtn').onclick = openEndSheet;
   $('#recordBtn').onclick = () => startRecording();
   $('#locateBtn').onclick = () => {
-    if (me) map.setView(me.latlng, Math.max(map.getZoom(), 16));
-    else toast('Waiting for your location…');
+    if (!me) return toast('Waiting for your location…');
+    if (nav) return map.setView(me.latlng, Math.max(map.getZoom(), 16));
+    // tap: follow -> follow with heading up -> follow north-up; after a drag it picks the old mode back up
+    setFollow(fol.paused ? fol.resume : fol.mode === 1 ? 2 : 1);
   };
+  updateLocateBtn();
   $('#recenterBtn').onclick = recenter;
   $('#voiceBtn').onclick = () => {
     store.update(s => { s.voice = !s.voice; });
@@ -1355,6 +1450,7 @@ function renderVoiceBtn() {
 
 function startNavigation(option, resume) {
   if (!option) return;
+  fol.mode = 0; fol.paused = false; updateLocateBtn();
   const bike = store.activeBike();
   nav = {
     route: option.route,
@@ -1551,6 +1647,7 @@ function stopNavigation(arrived, discard = false) {
 
   if (arrived || session.recordOnly) {
     from = ME; to = null; syncInputs(); clearRoutes();
+    setFollow(fol.resume);
   } else if (to) {
     planRoute();
   }
@@ -1618,6 +1715,7 @@ addEventListener('orientationchange', onViewportChange);
 
 function rotateMap() {
   let target = nav ? 0 : userRot;
+  if (!nav && fol.mode === 2 && !fol.paused) target = folHeading() ?? userRot;
   if (nav?.manual != null) target = nav.manual;
   else if (nav && !nav.overview) {
     const mode = S().orientation;
@@ -1692,7 +1790,7 @@ function setupTwist() {
   const ang = ts => Math.atan2(ts[1].clientY - ts[0].clientY, ts[1].clientX - ts[0].clientX) * 180 / Math.PI;
   addEventListener('touchstart', e => {
     if (e.touches.length !== 2 || locked || ![...e.touches].every(t => t.target.closest?.('#map'))) return;
-    g = { last: ang(e.touches), twist: 0, on: false, base: nav ? (nav.manual ?? mapRotation) : userRot };
+    g = { last: ang(e.touches), twist: 0, on: false, base: nav ? (nav.manual ?? mapRotation) : (fol.mode === 2 && !fol.paused ? mapRotation : userRot) };
   }, true);
   addEventListener('touchmove', e => {
     if (!g || e.touches.length !== 2) return;
@@ -1705,7 +1803,7 @@ function setupTwist() {
       // Only switch to the rotatable frame once it's really a twist: swapping it in on every
       // two-finger touch resized the map mid-pinch and made it jump sideways.
       clearTimeout(rotFrameTimer);
-      if (!nav) setRotFrame(true);
+      if (!nav) { setRotFrame(true); if (fol.mode && !fol.paused) { userRot = mapRotation; pauseFollow(); } }
       document.body.classList.add('twisting');
     }
     const deg = g.base - g.twist;
@@ -1748,6 +1846,7 @@ function followCamera(fix, st) {
 
 function recenter() {
   if (!nav) {
+    if (fol.paused) return setFollow(fol.resume);
     // just looking around: fly back to where you are
     if (me) map.flyTo(me.latlng, Math.max(map.getZoom(), 15), { duration: 0.8 });
     return;
@@ -2695,6 +2794,7 @@ let pickState = null;   // { bounds, name, ok }
 async function openPicker() {
   if (offJob) { toast('A download is already running'); return; }
   closeSettings();
+  stopFollow(true);
   resetNorth(true);
   picking = true;
   document.body.classList.add('picking');
