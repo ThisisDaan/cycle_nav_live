@@ -853,7 +853,8 @@ body.drawer-open #recenterBtn { display: none; }
 }
 
 /* direction along the chosen route: dashes sliding towards the destination, plus still arrows */
-.route-flow.moving { animation: flow-move .9s linear infinite; }
+/* steps(): about 20 redraws a second instead of 60, the line repaints on every step */
+.route-flow.moving { animation: flow-move .9s steps(18) infinite; }
 @keyframes flow-move { to { stroke-dashoffset: -18; } }
 @media (prefers-reduced-motion: reduce) { .route-flow.moving { animation: none; } }
 .flow-icon { pointer-events: none; }

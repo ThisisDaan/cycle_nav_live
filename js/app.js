@@ -1033,7 +1033,7 @@ function drawRoutes(onlySelected = false) {
     L.polyline(r.coords, { color: accent, weight: 7, opacity: 1, interactive: false }).addTo(routeLayer);
   }
   // dashes that slide along the line towards the destination (still while navigating, to save battery)
-  L.polyline(r.coords, { className: nav ? 'route-flow' : 'route-flow moving', color: '#1d2a33', weight: 3, opacity: .7, dashArray: '4 14', lineCap: 'round', interactive: false }).addTo(routeLayer);
+  L.polyline(r.coords, { className: nav ? 'route-flow' : 'route-flow moving', color: '#1d2a33', weight: 4, opacity: .3, dashArray: '4 14', lineCap: 'round', interactive: false }).addTo(routeLayer);
   drawFlow();
   if (!nav) {
     // A wide invisible line that is easy to hit with a finger: press and drag it
