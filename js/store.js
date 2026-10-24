@@ -11,7 +11,7 @@ export const BIKE_TYPES = {
   mtb:   { label: 'Mountain / gravel', speed: 18 },
 };
 
-export const BIKE_ICONS = ['🚲', '🚴', '🚵', '🛵', '🛴', '⚡', '🐢', '🚀', '🦊', '🌿'];
+export const BIKE_ICONS = ['pedal_bike', 'bike', 'electric_bolt', 'terrain', 'speed', 'shopping_bag', 'eco', 'pets'];
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -20,7 +20,7 @@ export function newBike(overrides = {}) {
   return {
     id: uid(),
     name: 'My bike',
-    icon: '🚲',
+    icon: 'pedal_bike',
     color: '#2f9e6e',
     type,
     style: type === 'mtb' ? 'offroad' : 'calm',

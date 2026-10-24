@@ -15,7 +15,7 @@ import { refreshOfflineSegments, routingMode } from './router.js';
 import { adviseHere, adviseRide } from './weather.js';
 import { createRainFx } from './rainfx.js';
 import { cachedPlace, detailsHtml, isStation, lookupPlace, placeLinks, trainPlanner } from './placeinfo.js';
-import { icon, ICON_PATHS } from './icons.js';
+import { icon, ICON_PATHS, iconOrEmoji, iconName, PIN_ICONS } from './icons.js';
 import { LANGUAGES, language, startTranslating, t } from './i18n.js';
 import { bearing, dist, fmtClock, fmtDist, fmtDuration, projectOnSegment, resample, simplify } from './geo.js';
 
@@ -748,7 +748,7 @@ function meIconInner() {
   if (kind === 'dot') return cone + '<div class="me-dot"></div>';
   if (kind === 'bike') {
     const b = store.activeBike();
-    return cone + `<div class="bike-badge me-bike" style="--bike:${esc(b.color)}">${esc(b.icon)}</div>`;
+    return cone + `<div class="bike-badge me-bike" style="--bike:${esc(b.color)}">${iconOrEmoji(b.icon, 24)}</div>`;
   }
   return '<svg class="me-arrow me-rot" viewBox="0 0 40 40"><path d="M20 5 L32 33 L20 26.5 L8 33 Z" fill="var(--accent)" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg>';
 }
@@ -2341,13 +2341,13 @@ function arrowSvg(h, warn = false) {
 
 // ---------------------------------------------------------------- pins
 
-const PIN_EMOJIS = ['📍', '🏠', '🏢', '☕', '🍽️', '🍺', '🛒', '🏪', '🚉', '🅿️', '🚲', '🔧', '⛽', '🚰', '🚻', '🌳', '🏞️', '🏖️', '⛰️', '📸', '🏥', '🏫', '❤️', '⭐'];
+const pinIcon = (p, size = 18) => iconOrEmoji(p.icon || p.emoji, size);
 
 function renderPins() {
   if (!pinLayer) return;
   pinLayer.clearLayers();
   for (const p of S().pins.filter(x => x.show)) {
-    const m = L.marker(p.latlng, { icon: L.divIcon({ className: '', html: `<div class="pin-marker">${esc(p.emoji)}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] }), zIndexOffset: 200 });
+    const m = L.marker(p.latlng, { icon: L.divIcon({ className: '', html: `<div class="pin-marker">${pinIcon(p, 18)}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] }), zIndexOffset: 200 });
     m.on('click', () => openPinPopup(p.id));
     m.addTo(pinLayer);
   }
@@ -2362,7 +2362,7 @@ function openPinPopup(id) {
     ['edit', 'Edit'], ['del', 'Delete'],
   ].filter(Boolean);
   L.popup({ closeButton: false, offset: [0, -14] }).setLatLng(p.latlng)
-    .setContent(`<div class="map-popup"><b class="selectable">${esc(p.emoji)} ${esc(p.name)}</b>${p.note ? `<small>${esc(p.note)}</small>` : ''}${
+    .setContent(`<div class="map-popup"><b class="selectable">${pinIcon(p, 16)} ${esc(p.name)}</b>${p.note ? `<small>${esc(p.note)}</small>` : ''}${
       acts.map(([a, label, cls]) => `<button ${cls ? `class="${cls}"` : ''} data-a="${a}">${label}</button>`).join('')}</div>`)
     .openOn(map);
   map.getContainer().querySelectorAll('.leaflet-popup .map-popup button').forEach(b => b.onclick = () => {
@@ -2383,14 +2383,13 @@ async function deletePin(id) {
 }
 
 function editPin(pin, fresh) {
-  const d = pin || { id: null, name: '', emoji: '📍', note: '', show: true, ...fresh };
-  let emoji = d.emoji;
+  const d = pin || { id: null, name: '', icon: 'place', note: '', show: true, ...fresh };
+  let sel = iconName(d.icon || d.emoji) || d.icon || d.emoji;
   openDialog(`
     <h2>${pin ? 'Edit pin' : 'Save pin'}</h2>
     <label class="field"><span>Name</span><input type="text" id="pinName" value="${esc(d.name)}" placeholder="${esc(t('Pin'))}" maxlength="60"></label>
-    <div class="field"><span>Emoji</span>
-      <div class="emoji-grid">${PIN_EMOJIS.map(e => `<button type="button" class="emoji-opt ${e === emoji ? 'selected' : ''}" data-e="${e}">${e}</button>`).join('')}</div>
-      <input type="text" id="pinEmoji" value="${esc(emoji)}" placeholder="Any emoji" maxlength="8" class="emoji-input">
+    <div class="field"><span>Icon</span>
+      <div class="icon-grid">${PIN_ICONS.map(n => `<button type="button" class="icon-opt ${n === sel ? 'selected' : ''}" data-e="${n}" aria-label="${n}">${icon(n, 22)}</button>`).join('')}</div>
     </div>
     <label class="field"><span>Note (optional)</span><input type="text" id="pinNote" value="${esc(d.note)}" maxlength="120"></label>
     <label class="toggle"><span>Show on map</span><input type="checkbox" id="pinShow" ${d.show ? 'checked' : ''}></label>
@@ -2400,18 +2399,17 @@ function editPin(pin, fresh) {
       <button class="primary-btn" id="pinSave">Save</button>
     </div>`);
   const box = $('#dialogBody');
-  box.querySelectorAll('.emoji-opt').forEach(b => b.onclick = () => {
-    $('#pinEmoji').value = emoji = b.dataset.e;
-    box.querySelectorAll('.emoji-opt').forEach(x => x.classList.toggle('selected', x === b));
+  box.querySelectorAll('.icon-opt').forEach(b => b.onclick = () => {
+    sel = b.dataset.e;
+    box.querySelectorAll('.icon-opt').forEach(x => x.classList.toggle('selected', x === b));
   });
-  $('#pinEmoji').oninput = e => { emoji = e.target.value; box.querySelectorAll('.emoji-opt').forEach(x => x.classList.toggle('selected', x.dataset.e === emoji)); };
   $('#pinCancel').onclick = closeDialog;
   if (pin) $('#pinDel').onclick = () => { closeDialog(); deletePin(pin.id); };
   $('#pinSave').onclick = () => {
     const rec = {
       id: d.id || newRideId(),
       name: $('#pinName').value.trim() || t('Pin'),
-      emoji: ($('#pinEmoji').value.trim() || '📍'),
+      icon: sel || 'place',
       note: $('#pinNote').value.trim(),
       latlng: d.latlng,
       show: $('#pinShow').checked,
@@ -2465,7 +2463,7 @@ function offerSaveRide(session, arrived) {
       <div><b>${rec.speedKmh ? rec.speedKmh.toFixed(1) : '–'}</b><span>km/h avg</span></div>
     </div>
     <label class="field"><span>Ridden on</span>
-      <select id="saveBike">${S().bikes.map(b => `<option value="${b.id}" ${b.id === bike.id ? 'selected' : ''}>${esc(b.icon)} ${esc(b.name)}</option>`).join('')}</select>
+      <select id="saveBike">${S().bikes.map(b => `<option value="${b.id}" ${b.id === bike.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select>
     </label>
     <label class="field"><span>Name (optional)</span>
       <input type="text" id="saveName" placeholder="${esc(session.dest?.name ? t('To {0}', session.dest.name) : t('Ride'))}">
@@ -2594,7 +2592,7 @@ function renderBikeChip() {
   syncGL();
   const b = store.activeBike();
   const sp = bikeSpeed(b, rideList);
-  $('#bikeChip').innerHTML = `<span class="bike-badge" style="--bike:${esc(b.color)}">${esc(b.icon)}</span>
+  $('#bikeChip').innerHTML = `<span class="bike-badge" style="--bike:${esc(b.color)}">${iconOrEmoji(b.icon, 20)}</span>
     <span class="chip-text"><span class="chip-name">${esc(b.name)}</span><small>${sp.kmh.toFixed(1)} km/h · ${t(ROUTE_STYLES[b.style]?.label || 'Calm')}</small></span>`;
   if (S().theme.marker === 'bike') drawMe(true);
 }
@@ -2606,7 +2604,7 @@ function toggleBikeMenu() {
   menu.style.top = `${chip.bottom + 8}px`;
   menu.innerHTML = S().bikes.map(b => `
     <button data-id="${b.id}" class="${b.id === S().activeBikeId ? 'current' : ''}">
-      <span class="bike-badge" style="--bike:${esc(b.color)}">${esc(b.icon)}</span>
+      <span class="bike-badge" style="--bike:${esc(b.color)}">${iconOrEmoji(b.icon, 20)}</span>
       <span><b>${esc(b.name)}</b><small>${bikeSpeed(b, rideList).kmh.toFixed(1)} km/h · ${esc(t(BIKE_TYPES[b.type]?.label || ''))}</small></span>
     </button>`).join('') + '<button data-manage="1"><span class="bike-badge" style="--bike:var(--muted)">＋</span><span><b>Manage bikes</b></span></button>';
   menu.hidden = false;
@@ -2632,7 +2630,7 @@ function editBike(bikeId) {
     openDialog(`
       <h2>${isNew ? 'Add a bike' : 'Edit bike'}</h2>
       <label class="field"><span>Name</span><input type="text" id="bName" value="${esc(bike.name)}" placeholder="e.g. Gazelle, Road bike, Bakfiets"></label>
-      <div class="field"><span>Icon</span><div class="choices">${BIKE_ICONS.map(i => `<button class="choice emoji-choice ${i === bike.icon ? 'selected' : ''}" data-icon="${i}">${i}</button>`).join('')}</div></div>
+      <div class="field"><span>Icon</span><div class="choices">${BIKE_ICONS.map(i => `<button class="choice icon-choice ${i === (iconName(bike.icon) || bike.icon) ? 'selected' : ''}" data-icon="${i}" aria-label="${i}">${icon(i, 24)}</button>`).join('')}</div></div>
       <div class="field"><span>Colour</span><div class="choices">${ACCENTS.map(c => `<button class="swatch ${c === bike.color ? 'selected' : ''}" style="background:${c}" data-color="${c}" aria-label="${c}"></button>`).join('')}
         <label class="swatch swatch-custom ${ACCENTS.includes(bike.color) ? '' : 'selected'}" title="Custom colour"><input type="color" id="bColor" value="${esc(bike.color)}"></label></div></div>
       <label class="field"><span>Type</span><select id="bType">${Object.entries(BIKE_TYPES).map(([k, t]) => `<option value="${k}" ${k === bike.type ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
@@ -2706,7 +2704,7 @@ function bikesTab() {
     ${S().bikes.map(b => {
       const sp = bikeSpeed(b, rideList);
       return `<div class="list-item">
-        <span class="bike-badge" style="--bike:${esc(b.color)}">${esc(b.icon)}</span>
+        <span class="bike-badge" style="--bike:${esc(b.color)}">${iconOrEmoji(b.icon, 20)}</span>
         <div class="li-main"><div class="li-title">${esc(b.name)} ${b.id === S().activeBikeId ? '<span class="tag">riding</span>' : ''}</div>
           <div class="li-sub">${esc(t(BIKE_TYPES[b.type]?.label))} · ${t('{0} routes', t(ROUTE_STYLES[b.style]?.label))} · ${sp.kmh.toFixed(1)} km/h${sp.learned ? ` ${t('(learned from {0} rides)', sp.rides)}` : ''}</div></div>
         ${b.id !== S().activeBikeId ? `<button class="secondary-btn" data-use="${b.id}">Use</button>` : ''}
@@ -2846,7 +2844,7 @@ function renderDrawer() {
   const act = (a, label, cls = '', tip = '') => `<button class="sact ${cls}" data-a="${a}"${tip ? ` title="${esc(tip)}" aria-label="${esc(tip)}"` : ''}>${label}</button>`;
   let html;
   if (tab === 'pins') {
-    html = items.map(p => row(p.id, `<span class="srow-ic">${esc(p.emoji)}</span>`, p.name,
+    html = items.map(p => row(p.id, `<span class="srow-ic">${pinIcon(p, 24)}</span>`, p.name,
       [me ? esc(t('{0} from you', fmtDist(dist(me.latlng, p.latlng)))) : '', esc(p.note || '')].filter(Boolean).join(' · ') || esc(t('Pin')),
       (navStop ? act('stop', icon('add', 16) + ' ' + t('Add as stop'), 'go') : nav ? '' : act('to', icon('directions', 16) + ' ' + t('Directions to here'), 'go')) +
       act('show', icon(p.show ? 'visibility' : 'visibility_off', 20), 'ic ' + (p.show ? 'on' : ''), p.show ? t('Shown on map') : t('Hidden on map')) +
@@ -2854,7 +2852,7 @@ function renderDrawer() {
   } else {
     html = items.map(r => {
       const b = S().bikes.find(x => x.id === r.bikeId);
-      const badge = `<span class="srow-ic" style="--bike:${esc(b?.color || '#888')}">${esc(b?.icon || '🚲')}</span>`;
+      const badge = `<span class="srow-ic" style="--bike:${esc(b?.color || '#888')}">${iconOrEmoji(b?.icon, 24)}</span>`;
       const speed = tab === 'rides' && r.movingTime ? ` · ${(r.distance / r.movingTime * 3.6).toFixed(1)} km/h` : '';
       return row(r.id, badge, r.name || t('Ride'), `${esc(fmtDist(r.distance))} · ${esc(dFmtDate(r.startedAt))}${speed}`,
         (nav ? '' : act('ride', icon('play', 16) + ' ' + t('Ride it'), 'go')) + act('rename', icon('edit', 20), 'ic', t('Rename')) + act('gpx', 'GPX', '', t('Export GPX')) + act('del', icon('delete', 20), 'ic danger', t('Delete')));
@@ -2928,7 +2926,7 @@ async function drawerAction(id, a) {
     if (a === 'open') {
       if (nav) {
         if (nav.recordOnly) return;
-        if (await askConfirm(t('Add {0} as a stop?', `${pin.emoji} ${pin.name}`), { ok: 'Add as stop' })) { closeDrawer(); addStop(place); }
+        if (await askConfirm(t('Add {0} as a stop?', pin.name), { ok: 'Add as stop' })) { closeDrawer(); addStop(place); }
         return;
       }
       closeDrawer();
