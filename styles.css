@@ -850,3 +850,8 @@ body.drawer-open #recenterBtn { display: none; }
   .undo-bar { left: calc(50% + var(--panel-w) / 2); bottom: calc(14px + var(--safe-bottom)); }
   .nav-handle { display: none; }
 }
+
+/* direction chevrons along the chosen route */
+.flow-icon { pointer-events: none; }
+.flow-icon i { display: block; position: relative; width: 14px; height: 14px; }
+.flow-icon i::before { content: ''; position: absolute; left: 3.5px; top: 4.5px; width: 7px; height: 7px; border: solid #fff; border-width: 2.5px 0 0 2.5px; transform: rotate(45deg); filter: drop-shadow(0 0 1px rgba(0,0,0,.45)); }

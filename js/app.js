@@ -1032,11 +1032,42 @@ function drawRoutes(onlySelected = false) {
   } else {
     L.polyline(r.coords, { color: accent, weight: 7, opacity: 1, interactive: false }).addTo(routeLayer);
   }
+  drawFlow();
   if (!nav) {
     // A wide invisible line that is easy to hit with a finger: press and drag it
     // to pull the route somewhere else (or just tap it to drop a point).
     const hit = L.polyline(r.coords, { color: '#000', weight: 30, opacity: 0, className: 'route-hit' }).addTo(routeLayer);
     enableLineDrag(hit.getElement(), r);
+  }
+}
+
+// Small chevrons along the chosen route showing which way to ride (handy for GPX loops that cross themselves).
+// Spaced in screen pixels and limited to the visible area, so they are redrawn after every zoom or pan.
+var flowLayer = null;
+const FLOW_GAP = 90;
+function drawFlow() {
+  if (!flowLayer) {
+    flowLayer = L.layerGroup().addTo(map);
+    map.on('zoomend moveend', drawFlow);
+  }
+  flowLayer.clearLayers();
+  const r = options[selected]?.route;
+  if (!r || map.getZoom() < 13 || !map.hasLayer(routeLayer) || !routeLayer.getLayers().length) return;
+  const view = map.getBounds().pad(0.3);
+  let carry = FLOW_GAP / 2, prev = map.latLngToLayerPoint(r.coords[0]);
+  for (let i = 1; i < r.coords.length; i++) {
+    const cur = map.latLngToLayerPoint(r.coords[i]), seg = prev.distanceTo(cur);
+    while (carry <= seg) {
+      const f = carry / seg, pt = L.point(prev.x + (cur.x - prev.x) * f, prev.y + (cur.y - prev.y) * f), ll = map.layerPointToLatLng(pt);
+      if (view.contains(ll)) {
+        const deg = Math.round(Math.atan2(cur.x - prev.x, prev.y - cur.y) * 180 / Math.PI);
+        L.marker(ll, { interactive: false, keyboard: false, zIndexOffset: -200,
+          icon: L.divIcon({ className: 'flow-icon', html: `<i style="transform:rotate(calc(${deg}deg - var(--irot, 0deg)))"></i>`, iconSize: [14, 14], iconAnchor: [7, 7] }),
+        }).addTo(flowLayer);
+      }
+      carry += FLOW_GAP;
+    }
+    carry -= seg; prev = cur;
   }
 }
 
@@ -1312,7 +1343,7 @@ function clearRoutes() {
   options = [];
   vias = [];
   gpxRoute = null;
-  routeLayer.clearLayers();
+  routeLayer.clearLayers(); flowLayer?.clearLayers();
   viaLayer.clearLayers();
   $('#viaRows').innerHTML = '';
   startMarker?.remove(); endMarker?.remove();
