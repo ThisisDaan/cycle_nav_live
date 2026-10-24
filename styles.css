@@ -206,7 +206,8 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .sheet.collapsed .route-status, .sheet.collapsed .route-card:not(.selected) { display: none; }
 .sheet.collapsed .route-cards { padding-bottom: 8px; }
 .route-hint { white-space: nowrap; }
-.sheet-actions { display: flex; gap: 8px; }
+.sheet-actions { display: flex; gap: 8px; flex: none; padding-top: 12px; border-top: 1px solid var(--border); }
+.sheet.collapsed .sheet-actions { border-top: 0; padding-top: 4px; }
 .sheet-actions .secondary-btn { flex: none; padding: 0 16px; border-radius: 14px; }
 .link-btn { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 700; text-decoration: underline; }
 .via-marker {
