@@ -738,7 +738,7 @@ function renderSuggestions(which, items, extraHtml = '', head = '') {
   let html = extraHtml;
   suggestionItems.forEach((it, i) => {
     if (head && i === suggestionItems.findIndex(x => x.recent)) html += `<li class="s-head">${esc(head)}</li>`;
-    html += `<li data-i="${i}"><span class="s-icon">${it.icon || '📍'}</span><span class="s-text"><div class="s-name">${esc(it.name)}</div>${it.detail ? `<div class="s-detail">${esc(it.detail)}</div>` : ''}</span>${(it.latlng || it.isMe) && !it.recent ? `<button class="s-pin" data-pin aria-label="Save as pin" title="Save as pin">${BOOKMARK_SVG}</button>` : ''}</li>`;
+    html += `<li data-i="${i}"><span class="s-icon">${it.icon || '📍'}</span><span class="s-text"><div class="s-name">${esc(it.name)}</div>${it.detail ? `<div class="s-detail">${esc(it.detail)}</div>` : ''}</span>${(it.latlng || it.isMe) && !it.recent ? `${pinBtn(it)}` : ''}</li>`;
   });
   ul.innerHTML = html;
   ul.hidden = !html;
@@ -1041,6 +1041,39 @@ function drawRoutes(onlySelected = false) {
   }
 }
 
+// ---- live rain radar (RainViewer): the last two hours of radar, looped every few seconds
+var radar = null;
+async function toggleRadar(on = !radar) {
+  $('#radarBtn').classList.toggle('active', on);
+  if (!on) {
+    clearInterval(radar?.timer); radar?.layers.forEach(l => l.remove()); radar = null;
+    $('#radarTime').hidden = true; return;
+  }
+  radar = { layers: [], timer: null };
+  const mine = radar;
+  let d;
+  try { d = await (await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: AbortSignal.timeout(7000) })).json(); }
+  catch { if (radar === mine) toggleRadar(false); toast(t('Rain radar needs a connection')); return; }
+  if (radar !== mine) return;
+  const frames = d.radar.past.slice(-7);
+  // every frame is its own layer, hidden until it is its turn, so the loop never waits for tiles
+  radar.layers = frames.map(f => L.tileLayer(`${d.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`, {
+    opacity: 0, maxNativeZoom: 7, maxZoom: 20, zIndex: 300, className: 'radar-tiles', attribution: 'RainViewer',
+  }).addTo(map));
+  let i = frames.length - 1, pause = 0;
+  const show = () => {
+    radar.layers.forEach((l, k) => l.setOpacity(k === i ? 0.6 : 0));
+    const ago = Math.round((Date.now() / 1000 - frames[i].time) / 60);
+    $('#radarTime').hidden = false;
+    $('#radarTime').textContent = `${t('Rain radar')} · ${ago <= 10 ? t('now') : t('{0} ago', fmtDuration(ago * 60))}`;
+  };
+  show();
+  radar.timer = setInterval(() => {
+    if (i === frames.length - 1 && pause++ < 3) return; // linger on the latest frame
+    pause = 0; i = (i + 1) % frames.length; show();
+  }, 700);
+}
+
 // Small chevrons along the chosen route showing which way to ride (handy for GPX loops that cross themselves).
 // Spaced in screen pixels and limited to the visible area, so they are redrawn after every zoom or pan.
 var flowLayer = null;
@@ -1188,6 +1221,13 @@ function undo() {
   if (to) planRoute({ fit: false }); else clearRoutes();
 }
 
+// outline grey until the place is actually saved, then solid in the accent colour
+const BOOKMARK_LINE_SVG = '<svg class="bm-ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M17 4H7a1 1 0 0 0-1 1v14.5l6-2.6 6 2.6V5a1 1 0 0 0-1-1z"/></svg>';
+function pinBtn(it) {
+  const ll = it.isMe ? me?.latlng : it.latlng;
+  const saved = ll && (S().pins || []).some(p => dist(p.latlng, ll) < 30);
+  return `<button class="s-pin${saved ? ' saved' : ''}" data-pin aria-label="Save as pin" title="Save as pin">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG}</button>`;
+}
 const BOOKMARK_SVG = '<svg class="bm-ic" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>';
 const viaLetter = i => String.fromCharCode(65 + i % 26);
 let viaRowsOpen = false;     // more than two points fold into one "n points in between" row
@@ -1453,6 +1493,7 @@ function setupButtons() {
     if (nav?.follow && me) followCamera(me, nav.last);
   };
   document.querySelectorAll('.lockBtn').forEach(b => b.onclick = lockScreen);
+  $('#radarBtn').onclick = () => toggleRadar();
   setupFullscreen();
   setupLock();
   navCtl = bottomSheet({
