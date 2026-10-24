@@ -399,17 +399,32 @@ async function dropPin(latlng) {
 
 // ---------------------------------------------------------------- GPS & position marker
 
+let gpsWatch = null, lastFixAt = 0, fixErrorShown = false;
 function startGps() {
   if (!('geolocation' in navigator)) { toast('This device has no location support'); return; }
-  navigator.geolocation.watchPosition(pos => {
+  watchGps();
+  // Phones (iPhone Safari especially) silently stop a location watch after a timeout or when the
+  // screen was off. If no fix arrives for a while, or we come back to the app, start it again.
+  setInterval(() => { if (!document.hidden && Date.now() - lastFixAt > 15000) watchGps(); }, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) watchGps(); });
+}
+
+function watchGps() {
+  if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch);
+  gpsWatch = navigator.geolocation.watchPosition(pos => {
+    lastFixAt = Date.now();
     if (nav?.sim) return; // the simulator is driving
-    handleFix({
+    try { handleFix({
       latlng: [pos.coords.latitude, pos.coords.longitude],
       accuracy: pos.coords.accuracy,
       heading: Number.isFinite(pos.coords.heading) ? pos.coords.heading : null,
       speed: Number.isFinite(pos.coords.speed) ? pos.coords.speed : null,
       time: pos.timestamp,
-    });
+    }); } catch (e) {
+      // never let one bad fix freeze the position: log it and keep taking fixes
+      console.error(e);
+      if (!fixErrorShown) { fixErrorShown = true; toast(t('Something went wrong, still following your location')); }
+    }
   }, err => {
     if (err.code === err.PERMISSION_DENIED) toast('Location is off — type a start point, or allow location access');
   }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });

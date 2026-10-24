@@ -378,6 +378,7 @@ const NL = {
   '3D view: off': '3D-weergave: uit',
   'Slide to unlock': 'Schuif om te ontgrendelen',
   'Screen locked': 'Scherm vergrendeld',
+  'Something went wrong, still following your location': 'Er ging iets mis, je locatie wordt nog steeds gevolgd',
   'Full screen': 'Volledig scherm',
   'For full screen: tap Share, then “Add to Home Screen”': 'Voor volledig scherm: tik op Delen en dan “Zet op beginscherm”',
   'Lock screen': 'Scherm vergrendelen',
