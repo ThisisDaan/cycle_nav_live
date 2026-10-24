@@ -528,6 +528,12 @@ function watchGps() {
 
 function handleFix(fix) {
   const first = !me;
+  // Standing still, GPS wanders a few metres every second: keep the arrow put until we're clearly
+  // moving (over ~4 km/h) or the new fix lands outside the GPS error circle.
+  if (!first) {
+    const d = dist(me.latlng, fix.latlng), r = Math.max(6, Math.min(25, (fix.accuracy || 10) * 0.8));
+    if ((fix.speed == null || fix.speed < 1.2) && d < r) fix = { ...fix, latlng: me.latlng, heading: me.heading };
+  }
   if (first) setTimeout(() => { if (me) wxUpdate(); }, 0);
   if (fix.heading == null) {
     if (lastMovedFrom && dist(lastMovedFrom, fix.latlng) > 6) {
