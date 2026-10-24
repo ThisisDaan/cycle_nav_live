@@ -2622,6 +2622,8 @@ function setActiveBike(id) {
   if (changed && to && !nav) planRoute();
 }
 
+// the theme accents plus 8 more, so bikes are easy to tell apart
+const BIKE_COLORS = [...ACCENTS, '#d93a3a', '#7cb518', '#1e6b45', '#23408e', '#b03aa8', '#8a5a33', '#8a949c', '#1b1f23'];
 function editBike(bikeId) {
   const isNew = !bikeId;
   const bike = isNew ? newBike({ name: '', color: ACCENTS[S().bikes.length % ACCENTS.length] }) : { ...S().bikes.find(b => b.id === bikeId) };
@@ -2631,8 +2633,7 @@ function editBike(bikeId) {
       <h2>${isNew ? 'Add a bike' : 'Edit bike'}</h2>
       <label class="field"><span>Name</span><input type="text" id="bName" value="${esc(bike.name)}" placeholder="e.g. Gazelle, Road bike, Bakfiets"></label>
       <div class="field"><span>Icon</span><div class="choices">${BIKE_ICONS.map(i => `<button class="choice icon-choice ${i === (iconName(bike.icon) || bike.icon) ? 'selected' : ''}" data-icon="${i}" aria-label="${i}">${icon(i, 24)}</button>`).join('')}</div></div>
-      <div class="field"><span>Colour</span><div class="choices">${ACCENTS.map(c => `<button class="swatch ${c === bike.color ? 'selected' : ''}" style="background:${c}" data-color="${c}" aria-label="${c}"></button>`).join('')}
-        <label class="swatch swatch-custom ${ACCENTS.includes(bike.color) ? '' : 'selected'}" title="Custom colour"><input type="color" id="bColor" value="${esc(bike.color)}"></label></div></div>
+      <div class="field"><span>Colour</span><div class="choices">${BIKE_COLORS.map(c => `<button class="swatch ${c === bike.color ? 'selected' : ''}" style="background:${c}" data-color="${c}" aria-label="${c}"></button>`).join('')}</div></div>
       <label class="field"><span>Type</span><select id="bType">${Object.entries(BIKE_TYPES).map(([k, t]) => `<option value="${k}" ${k === bike.type ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
       <div class="field"><span>Route style</span><div class="choices">${Object.entries(ROUTE_STYLES).map(([k, s]) => `<button class="choice ${k === bike.style ? 'selected' : ''}" data-style="${k}">${s.label}<small>${s.desc}</small></button>`).join('')}</div></div>
       <label class="field"><span>Average speed (km/h)</span><input type="number" id="bSpeed" min="5" max="45" step="0.5" value="${bike.speed}"></label>
@@ -2649,7 +2650,6 @@ function editBike(bikeId) {
     body.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => { keep(); bike.icon = b.dataset.icon; render(); });
     body.querySelectorAll('[data-color]').forEach(b => b.onclick = () => { keep(); bike.color = b.dataset.color; render(); });
     body.querySelectorAll('[data-style]').forEach(b => b.onclick = () => { keep(); bike.style = b.dataset.style; render(); });
-    $('#bColor').onchange = e => { keep(); bike.color = e.target.value; render(); };
     $('#bType').onchange = e => {
       keep();
       const prev = BIKE_TYPES[bike.type];
