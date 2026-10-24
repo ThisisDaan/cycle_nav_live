@@ -47,9 +47,10 @@ input, select { font: inherit; color: inherit; }
 body.nav-3d { --tilt: 50deg; }
 body.nav-3d #mapWrap { perspective: 1500px; }
 body.nav-3d #map { overflow: visible; transform-style: preserve-3d; }
-body.nav-3d #map .leaflet-pane, body.nav-3d .me-marker { transform-style: preserve-3d; }
+body.nav-3d #map .leaflet-pane { transform-style: preserve-3d; }
 .me-tilt { position: absolute; inset: 0; }
-body.nav-3d .me-tilt { transform: rotate(var(--rot, 0deg)) rotateX(calc(-1 * var(--tilt))) rotate(calc(-1 * var(--rot, 0deg))); transition: transform .5s linear; }
+/* flat on the tilted map, stretched back along the screen vertical so it looks like a normal arrow */
+body.nav-3d .me-tilt { transform: rotate(var(--rot, 0deg)) scaleY(calc(1 / cos(var(--tilt)))) rotate(calc(-1 * var(--rot, 0deg))); transition: transform .5s linear; }
 #skyFog { position: fixed; left: 0; right: 0; top: 0; height: 42%; pointer-events: none; display: none; z-index: 5;
   background: linear-gradient(to bottom, var(--sky) 0, var(--sky) 22%, color-mix(in srgb, var(--sky) 55%, transparent) 55%, transparent 100%); }
 body.nav-3d #skyFog { display: block; }
