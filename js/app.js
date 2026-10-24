@@ -399,17 +399,21 @@ async function dropPin(latlng) {
 
 // ---------------------------------------------------------------- GPS & position marker
 
-let gpsWatch = null, lastFixAt = 0, fixErrorShown = false;
+// var, not let: startGps runs from init() before the module reaches this line
+var gpsWatch = null, lastFixAt = 0, watchStartedAt = 0, fixErrorShown = false;
 function startGps() {
   if (!('geolocation' in navigator)) { toast('This device has no location support'); return; }
   watchGps();
   // Phones (iPhone Safari especially) silently stop a location watch after a timeout or when the
-  // screen was off. If no fix arrives for a while, or we come back to the app, start it again.
-  setInterval(() => { if (!document.hidden && Date.now() - lastFixAt > 15000) watchGps(); }, 5000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) watchGps(); });
+  // screen was off. If fixes stop coming, or we come back to the app after a while, start it again.
+  // A cold GPS can take a while for its first fix, so give a fresh watch 45 s before restarting it.
+  const stale = () => Date.now() - Math.max(lastFixAt, watchStartedAt) > (lastFixAt ? 20000 : 45000);
+  setInterval(() => { if (!document.hidden && stale()) watchGps(); }, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && lastFixAt && Date.now() - lastFixAt > 10000) watchGps(); });
 }
 
 function watchGps() {
+  watchStartedAt = Date.now();
   if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch);
   gpsWatch = navigator.geolocation.watchPosition(pos => {
     lastFixAt = Date.now();
@@ -530,7 +534,7 @@ function drawMe(rebuild = false) {
 
 // GPS fixes arrive about once a second: glide the marker to each new spot over roughly that
 // interval instead of jumping, like a car navigation arrow.
-const meGlide = { from: null, to: null, t0: 0, ms: 1000, last: 0, raf: 0 };
+var meGlide = { from: null, to: null, t0: 0, ms: 1000, last: 0, raf: 0 };
 function moveMe(ll) {
   const now = performance.now(), g = meGlide;
   const cur = g.to ? glidePos(now) : null;
