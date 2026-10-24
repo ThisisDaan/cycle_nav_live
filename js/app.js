@@ -2314,6 +2314,7 @@ async function drawerAction(id, a) {
 
 function setupDrawer() {
   $('#drawerClose').onclick = closeDrawer;
+  $('#savedBtn').onclick = () => openDrawer();
   $('#drawerScrim').onclick = closeDrawer;
   document.querySelectorAll('#drawerTabs .dtab').forEach(b => b.onclick = () => {
     const same = drawerOpen && drawerTab === b.dataset.dt;
@@ -2340,9 +2341,9 @@ function setupDrawer() {
     g = null;
     if (e.touches.length !== 1) return;
     const t0 = e.touches[0];
-    if (!drawerOpen && (t0.clientX <= 22 || e.target.closest('.dtab')) && !blocked()) {
+    if (!drawerOpen && (t0.clientX <= 22 || e.target.closest('#savedBtn')) && !blocked()) {
       if (t0.clientX <= 22) e.stopPropagation(); // keep Leaflet from panning the map under this swipe
-      g = { open: true, tab: e.target.closest('.dtab')?.dataset.dt };
+      g = { open: true };
     } else if (drawerOpen && e.target.closest('#drawerPanel, #drawerScrim')) g = { open: false };
     if (g) Object.assign(g, { x0: t0.clientX, y0: t0.clientY, x: t0.clientX, t: performance.now(), v: 0, on: false });
   }, { capture: true, passive: true });
