@@ -1077,7 +1077,8 @@ async function toggleRadar(on = !radar) {
 // Small chevrons along the chosen route showing which way to ride (handy for GPX loops that cross themselves).
 // Spaced in screen pixels and limited to the visible area, so they are redrawn after every zoom or pan.
 var flowLayer = null;
-const FLOW_GAP = 90;
+const FLOW_GAP = 70;
+const FLOW_SVG = '<svg viewBox="0 0 22 22" width="22" height="22"><path d="M11 3 19 15 11 11.5 3 15z" fill="#1d2a33" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
 function drawFlow() {
   if (!flowLayer) {
     flowLayer = L.layerGroup().addTo(map);
@@ -1087,7 +1088,7 @@ function drawFlow() {
   const r = options[selected]?.route;
   if (!r || map.getZoom() < 13 || !map.hasLayer(routeLayer) || !routeLayer.getLayers().length) return;
   const view = map.getBounds().pad(0.3);
-  let carry = FLOW_GAP / 2, prev = map.latLngToLayerPoint(r.coords[0]);
+  let carry = FLOW_GAP / 2, prev = map.latLngToLayerPoint(r.coords[0]), n = 0;
   for (let i = 1; i < r.coords.length; i++) {
     const cur = map.latLngToLayerPoint(r.coords[i]), seg = prev.distanceTo(cur);
     while (carry <= seg) {
@@ -1095,7 +1096,8 @@ function drawFlow() {
       if (view.contains(ll)) {
         const deg = Math.round(Math.atan2(cur.x - prev.x, prev.y - cur.y) * 180 / Math.PI);
         L.marker(ll, { interactive: false, keyboard: false, zIndexOffset: -200,
-          icon: L.divIcon({ className: 'flow-icon', html: `<i style="transform:rotate(calc(${deg}deg - var(--irot, 0deg)))"></i>`, iconSize: [14, 14], iconAnchor: [7, 7] }),
+          // the pulse delay grows along the route, so a wave runs in the riding direction
+          icon: L.divIcon({ className: 'flow-icon', html: `<i style="transform:rotate(calc(${deg}deg - var(--irot, 0deg)));animation-delay:${(n++ % 8) * 0.15}s">${FLOW_SVG}</i>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
         }).addTo(flowLayer);
       }
       carry += FLOW_GAP;
