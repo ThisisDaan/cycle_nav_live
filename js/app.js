@@ -1174,6 +1174,7 @@ function setupButtons() {
     if (nav?.follow && me) followCamera(me, nav.last);
   };
   document.querySelectorAll('.lockBtn').forEach(b => b.onclick = lockScreen);
+  setupFullscreen();
   setupLock();
   navCtl = bottomSheet({
     el: $('#navBar'), grips: [$('#navBar .sheet-handle'), $('#navToggle')], scroller: $('#navBar'),
@@ -2716,6 +2717,21 @@ $('#dialog').addEventListener('click', e => { if (e.target.id === 'dialog') clos
 $('#settings').addEventListener('click', e => { if (e.target.id === 'settings') closeSettings(); });
 
 let toastTimer;
+// Web only: full screen (the Android app already is). iPhone Safari can't, so explain the home-screen way.
+function setupFullscreen() {
+  if (isNative || matchMedia('(display-mode: standalone)').matches || navigator.standalone) return;
+  const can = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+  document.querySelectorAll('.fsBtn').forEach(b => {
+    b.hidden = false;
+    b.onclick = () => {
+      if (!can) return toast(t('For full screen: tap Share, then “Add to Home Screen”'));
+      const el = document.documentElement;
+      if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else (el.requestFullscreen || el.webkitRequestFullscreen).call(el).catch?.(() => {});
+    };
+  });
+}
+
 function toast(msg) {
   const t = $('#toast');
   t.textContent = msg;

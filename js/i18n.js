@@ -372,6 +372,8 @@ const NL = {
   '3D view: off': '3D-weergave: uit',
   'Slide to unlock': 'Schuif om te ontgrendelen',
   'Screen locked': 'Scherm vergrendeld',
+  'Full screen': 'Volledig scherm',
+  'For full screen: tap Share, then “Add to Home Screen”': 'Voor volledig scherm: tik op Delen en dan “Zet op beginscherm”',
   'Lock screen': 'Scherm vergrendelen',
   'Demo mode (simulate riding the route)': 'Demomodus (rit over de route simuleren)',
   'Demo mode lets you try navigation at your desk. Simulated rides can still be saved, so discard them.': 'Met demomodus probeer je navigatie achter je bureau. Gesimuleerde ritten kun je opslaan, dus gooi ze weg.',
