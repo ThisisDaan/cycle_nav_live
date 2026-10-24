@@ -1088,7 +1088,7 @@ function drawFlow() {
   }
   flowLayer.clearLayers();
   const r = options[selected]?.route;
-  if (!r || map.getZoom() < 13 || !map.hasLayer(routeLayer) || !routeLayer.getLayers().length) return;
+  if (!r || !gpxRoute || map.getZoom() < 13 || !map.hasLayer(routeLayer) || !routeLayer.getLayers().length) return; // GPX routes only
   const view = map.getBounds().pad(0.3);
   let carry = FLOW_GAP / 2, prev = map.latLngToLayerPoint(r.coords[0]);
   for (let i = 1; i < r.coords.length; i++) {
