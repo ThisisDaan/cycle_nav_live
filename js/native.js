@@ -24,7 +24,25 @@ export async function initNative() {
     Filesystem: reg('Filesystem'),
     Share: reg('Share'),
     App: reg('App'),
+    Http: reg('CapacitorHttp'),
   };
+}
+
+// Overpass (OpenStreetMap search) query, resolving to its elements. The Android WebView adds an
+// X-Requested-With header that overpass-api.de answers with 406, so the app goes through native HTTP.
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
+export async function overpass(query, timeoutMs = 15000) {
+  const body = 'data=' + encodeURIComponent(query);
+  if (isNative && P?.Http) {
+    const r = await P.Http.request({ url: OVERPASS, method: 'POST', data: body, connectTimeout: timeoutMs, readTimeout: timeoutMs,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'CycleNav/1.0 (bike navigation app)' } });
+    if (r.status !== 200) throw new Error('overpass ' + r.status);
+    const d = typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+    return d.elements || [];
+  }
+  const r = await fetch(OVERPASS, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(timeoutMs) });
+  if (!r.ok) throw new Error('overpass ' + r.status);
+  return (await r.json()).elements || [];
 }
 
 export function speak(text) {

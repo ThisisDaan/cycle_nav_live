@@ -1,45 +1,41 @@
-// Online details for a tapped place: OSM tags from Overpass, rendered as compact popup rows.
+// Online details for a tapped place: OSM tags from Nominatim, rendered as compact popup rows.
 
 import { t } from './i18n.js';
 import { DAY_NAMES, formatStatus, hoursStatus, parseHours, weekStrings } from './hours.js';
 
-const ENDPOINT = 'https://overpass-api.de/api/interpreter';
 const cache = new Map();
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const rx = s => s.replace(/[.*+?^${}()|[\]\\"]/g, '\$&');
 const dist = (a, b) => {
   const k = Math.PI / 180, dx = (b[1] - a[1]) * k * Math.cos(a[0] * k), dy = (b[0] - a[0]) * k;
   return Math.hypot(dx, dy) * 6371000;
 };
-const centre = el => el.center ? [el.center.lat, el.center.lon] : (el.lat != null ? [el.lat, el.lon] : null);
 
-async function overpass(q) {
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
-  try {
-    const r = await fetch(ENDPOINT, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: ctl.signal });
-    if (!r.ok) throw new Error('overpass ' + r.status);
-    return (await r.json()).elements || [];
-  } finally { clearTimeout(timer); }
-}
 
-// -> tags object or null. Cached per place (name + rounded coordinates).
+// -> tags object or null, cached per place (name + rounded coordinates).
+// Nominatim (OSM search) answers fast and returns the place's OSM tags as extratags; Overpass is often
+// overloaded. Looks for the same name within ~60 m and turns the result back into OSM-style tags.
 export async function lookupPlace(name, ll) {
   const key = `${name.toLowerCase()}|${ll[0].toFixed(4)}|${ll[1].toFixed(4)}`;
   if (cache.has(key)) return cache.get(key);
-  const [lat, lon] = ll;
-  const nearest = els => els.map(e => ({ e, d: dist(ll, centre(e) || ll) })).sort((a, b) => a.d - b.d)[0]?.e;
+  const [lat, lon] = ll, dy = 0.0006, dx = dy / Math.cos(lat * Math.PI / 180);
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&extratags=1&addressdetails=1&limit=5&bounded=1`
+    + `&q=${encodeURIComponent(name)}&viewbox=${lon - dx},${lat + dy},${lon + dx},${lat - dy}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
+  if (!r.ok) throw new Error('nominatim ' + r.status);
+  const n = name.toLowerCase();
+  const hits = (await r.json()).filter(h => { const m = (h.name || '').toLowerCase(); return m && (m.includes(n) || n.includes(m)); });
+  const best = hits.map(h => ({ h, d: dist(ll, [+h.lat, +h.lon]) })).sort((a, b) => a.d - b.d)[0]?.h;
   let tags = null;
-  const named = await overpass(`[out:json][timeout:8];nwr(around:40,${lat},${lon})["name"~"^${rx(name)}$",i];out tags center 5;`);
-  let best = nearest(named);
-  if (!best) {
-    // names in the map and in OSM can differ a little ("Rijksmuseum" / "Rijksmuseum Amsterdam"), but never
-    // borrow details from an unrelated neighbour such as a toilet next door
-    const n = name.toLowerCase(), alike = e => { const m = (e.tags?.name || '').toLowerCase(); return m && (m.includes(n) || n.includes(m)); };
-    const near = await overpass(`[out:json][timeout:8];nwr(around:60,${lat},${lon})["name"][~"^(amenity|shop|tourism|leisure)$"~"."];out tags center 10;`);
-    best = nearest(near.filter(alike));
+  if (best) {
+    const a = best.address || {};
+    tags = { ...best.extratags, name: best.name, [best.category]: best.type };
+    if (a.road) tags['addr:street'] = a.road;
+    if (a.house_number) tags['addr:housenumber'] = a.house_number;
+    if (a.postcode) tags['addr:postcode'] = a.postcode;
+    const city = a.city || a.town || a.village;
+    if (city) tags['addr:city'] = city;
   }
-  tags = best?.tags || null;
   cache.set(key, tags);
   return tags;
 }

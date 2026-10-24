@@ -4,7 +4,7 @@ import { fetchAlternatives, fetchRoute, hintText, isRoundabout, isUturn, ROUTE_S
 import { search, reverse } from './geocode.js';
 import { bikeSpeed, buildIndex, familiarity, findFamiliar, viaPointsFor } from './memory.js';
 import { Navigator, Recorder, Simulator } from './nav.js';
-import { initNative, isNative, keepAwake, onBackButton, saveFile, speak, stopSpeaking } from './native.js';
+import { initNative, isNative, keepAwake, onBackButton, overpass, saveFile, speak, stopSpeaking } from './native.js';
 import { ACCENTS, APP_ICONS, MAP_STYLES, MARKERS, applyTheme, iconSvg, tileStyle } from './theme.js';
 import { applyBuildings, BIKE_POI, calmStyle } from './mapstyle.js';
 import * as offline from './offline.js';
@@ -1320,12 +1320,7 @@ async function searchAlong(key) {
   const poly = pts.map(p => `${p[0].toFixed(5)},${p[1].toFixed(5)}`).join(',');
   let els;
   try {
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST', signal: AbortSignal.timeout(12000),
-      body: 'data=' + encodeURIComponent(`[out:json][timeout:10];nwr[${a[2]}](around:150,${poly});out center 120;`),
-    });
-    if (!res.ok) throw new Error(res.status);
-    els = (await res.json()).elements || [];
+    els = await overpass(`[out:json][timeout:12];nwr[${a[2]}](around:150,${poly});out center 120;`);
   } catch {
     if (token === alongToken) { clearAlong(); toast(t('Search along the route needs a connection')); }
     return;
