@@ -650,7 +650,7 @@ body.navigating #undoBtn, body.navigating #undoBar, body.picking #undoBtn { disp
 
 /* ---- landscape (phone turned sideways): a left column holds the panels, the map fills the rest ---- */
 @media (orientation: landscape) and (max-height: 500px) {
-  :root { --panel-w: calc(356px + var(--safe-left)); --col-l: calc(8px + var(--safe-left)); --col-r: calc(8px + var(--safe-right)); }
+  :root { --panel-w: calc(390px + var(--safe-left)); --col-l: calc(42px + var(--safe-left)); --col-r: calc(8px + var(--safe-right)); }
   #skyFog { left: var(--panel-w); height: 34%; }
   /* planner + route list */
   #planner { top: calc(8px + var(--safe-top)); left: var(--col-l); right: auto; width: 340px; max-width: none; max-height: 52vh; overflow-y: auto; z-index: 1001; padding: 2px 8px; }
@@ -733,7 +733,7 @@ body.navigating #undoBtn, body.navigating #undoBar, body.picking #undoBtn { disp
 #drawerPanel {
   position: absolute; left: 0; top: 0; bottom: 0;
   width: min(88vw, 400px);
-  transform: translateX(calc(var(--panel-w) - 100%));
+  transform: translateX(calc(var(--drawer-off, var(--panel-w)) - 100%));
   transition: transform .26s cubic-bezier(.2, .8, .2, 1);
   will-change: transform;
   touch-action: pan-y;
@@ -750,9 +750,9 @@ body.navigating #undoBtn, body.navigating #undoBar, body.picking #undoBtn { disp
 }
 #drawer:not(.on) .drawer-body { visibility: hidden; }
 #drawer.on #drawerPanel { pointer-events: auto; }
-@media (orientation: landscape) and (max-height: 500px) { #drawerPanel { width: calc(360px + var(--safe-left)); max-width: 80vw; } }
+@media (orientation: landscape) and (max-height: 500px) { #drawerPanel { width: calc(360px + var(--safe-left)); max-width: 80vw; } #drawer { --drawer-off: 0px; } }
 /* index tabs on the drawer's outer edge */
-.dtabs { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 4px; }
+.dtabs { position: absolute; left: 100%; top: calc(20px + var(--safe-top)); display: flex; flex-direction: column; gap: 4px; }
 .dtab {
   --tab-bg: color-mix(in srgb, var(--tc) 62%, var(--bg));
   position: relative; z-index: 1; width: 28px; height: 62px; margin-left: -2px; padding: 0;
@@ -766,6 +766,10 @@ body.navigating #undoBtn, body.navigating #undoBar, body.picking #undoBtn { disp
 .dtab span { display: block; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; margin: auto; }
 #drawer.on .dtab:not(.active) { z-index: -1; transform: translateX(-4px); padding-left: 4px; filter: saturate(.85) brightness(.96); }
 #drawer.on .dtab.active { background: var(--bg); box-shadow: inset -3px 0 0 var(--tc), 3px 1px 4px rgba(0, 0, 0, .18); }
+/* closed: one bookmark tab beside the search card; open: the section dividers */
+.dtab-main { height: 84px; }
+#drawer:not(.on) .dtab:not(.dtab-main), #drawer.on .dtab-main { display: none; }
+#planner { left: 42px; }
 body.navigating .dtabs, body.picking .dtabs, body.locked .dtabs,
 body:has(#settings:not([hidden]), #dialog:not([hidden]), #ask:not([hidden])) #drawer:not(.on) .dtabs { display: none; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px 18px; }

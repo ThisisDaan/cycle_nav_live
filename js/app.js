@@ -2232,7 +2232,7 @@ function renderDrawer() {
 
 function setDrawerPos(p) {
   drawerPos = p;
-  $('#drawerPanel').style.transform = `translateX(calc(${1 - p} * (var(--panel-w) - 100%)))`;
+  $('#drawerPanel').style.transform = `translateX(calc(${1 - p} * (var(--drawer-off, var(--panel-w)) - 100%)))`;
   $('#drawerScrim').style.opacity = p;
 }
 function openDrawer(tab) {
