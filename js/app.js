@@ -241,6 +241,8 @@ function setupMap() {
       s.view = { center: [c.lat, c.lng], zoom: map.getZoom() };
     }), 500);
   });
+  // Looking around without navigating: offer the same Re-centre button once you're off screen.
+  map.on('moveend', planRecenter);
   map.on('dragstart', () => {
     if (nav) { nav.follow = false; clearTimeout(recenterTimer); $('#recenterBtn').hidden = false; }
     else if (options.length) setSheetCollapsed(true);
@@ -530,6 +532,12 @@ function drawMe(rebuild = false) {
   accuracyCircle.setRadius(Math.min(me.accuracy || 0, 200));
   accuracyCircle.setStyle({ fillColor: S().theme.accent });
   applyHeading();
+}
+
+function planRecenter() {
+  if (nav) return;
+  const off = !!me && !map.getBounds().pad(-0.1).contains(me.latlng) && $('#sheet').hidden;
+  $('#recenterBtn').hidden = !off;
 }
 
 // GPS fixes arrive about once a second: glide the marker to each new spot over roughly that
@@ -1739,7 +1747,11 @@ function followCamera(fix, st) {
 }
 
 function recenter() {
-  if (!nav) return;
+  if (!nav) {
+    // just looking around: fly back to where you are
+    if (me) map.flyTo(me.latlng, Math.max(map.getZoom(), 15), { duration: 0.8 });
+    return;
+  }
   clearTimeout(recenterTimer);
   Object.assign(nav, { follow: true, overview: false, userZoom: null, manual: null });
   $('#recenterBtn').hidden = true;
