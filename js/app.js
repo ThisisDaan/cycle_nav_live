@@ -4,7 +4,7 @@ import { fetchAlternatives, fetchRoute, hintText, isRoundabout, isUturn, ROUTE_S
 import { search, reverse } from './geocode.js';
 import { bikeSpeed, buildIndex, familiarity, findFamiliar, viaPointsFor } from './memory.js';
 import { Navigator, Recorder, Simulator } from './nav.js';
-import { initNative, isNative, keepAwake, onBackButton, overpass, saveFile, speak, stopSpeaking } from './native.js';
+import { initNative, isNative, keepAwake, onBackButton, saveFile, speak, stopSpeaking } from './native.js';
 import { ACCENTS, APP_ICONS, MAP_STYLES, MARKERS, applyTheme, iconSvg, tileStyle } from './theme.js';
 import { applyBuildings, BIKE_POI, calmStyle } from './mapstyle.js';
 import * as offline from './offline.js';
@@ -273,7 +273,7 @@ function setupMap() {
   addEventListener('touchstart', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, { capture: true, passive: true });
   addEventListener('mousedown', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, true);
   setupTwist();
-  map.on('click', e => { hideSuggestions(); $('#bikeMenu').hidden = true; tapMap(e); });
+  map.on('click', e => { hideSuggestions(); $('#bikeMenu').hidden = true; hideNearbyMenu(); setMore(false); tapMap(e); });
   map.on('contextmenu', e => { lastCtx = Date.now(); if (!picking) dropPin([e.latlng.lat, e.latlng.lng]); });
 }
 
@@ -1050,10 +1050,9 @@ async function familiarRoute(a, b, bike) {
 
 function selectRoute(i, fit = false) {
   selected = i;
-  clearAlong();
+  clearNearby(true);
   scheduleSession();
   renderRouteCards();
-  renderAlong();
   drawRoutes();
   $('#startBtn').disabled = false;
   if (fit) {
@@ -1209,6 +1208,7 @@ function drawRoutes(onlySelected = false) {
 var radar = null;
 async function toggleRadar(on = !radar) {
   $('#radarBtn').classList.toggle('active', on);
+  syncMoreDot();
   if (!on) {
     clearInterval(radar?.timer); clearInterval(radar?.windTimer); radar?.fx.stop(); radar = null;
     $('#radarTime').hidden = true; return;
@@ -1335,65 +1335,150 @@ function enableLineDrag(el, route) {
   });
 }
 
-// ---- search along the route (Overpass): cafés, toilets, drinking water, bike shops within 150 m
-const ALONG = {
-  cafe: ['cafe', 'Café', '"amenity"="cafe"'], toilets: ['wc', 'Toilet', '"amenity"="toilets"'],
-  water: ['water', 'Drinking water', '"amenity"="drinking_water"'], bike: ['build', 'Bike shop', '"shop"="bicycle"'],
+// ---- find nearby (Nominatim): cafés, toilets, drinking water, bike shops, bike parking
+// With a route planned it searches along the selected route (within 150 m), otherwise around you (1.5 km).
+const NEARBY = {
+  cafe: { ic: 'cafe', label: 'Café', many: 'cafés', q: 'cafe', type: 'amenity/cafe' },
+  toilets: { ic: 'wc', label: 'Toilet', many: 'toilets', q: 'toilets', type: 'amenity/toilets' },
+  water: { ic: 'water', label: 'Drinking water', many: 'drinking water points', q: 'drinking water', type: 'amenity/drinking_water' },
+  bike: { ic: 'build', label: 'Bike shop', many: 'bike shops', q: 'bicycle shop', type: 'shop/bicycle' },
+  parking: { ic: 'parking', label: 'Bike parking', many: 'bike parking spots', q: 'bicycle parking', type: 'amenity/bicycle_parking' },
 };
-var along = null, alongToken = 0;
+var nearby = null, nearbyToken = 0;
+const NEARBY_AROUND = 1500, NEARBY_ROUTE = 150;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function renderAlong() {
-  const row = $('#alongRow');
-  row.innerHTML = Object.entries(ALONG).map(([k, a]) => `<button class="along-chip${along?.key === k ? ' on' : ''}" data-k="${k}">${icon(a[0], 16)} ${t(a[1])}</button>`).join('');
-  row.querySelectorAll('button').forEach(b => b.onclick = () => searchAlong(b.dataset.k));
-}
+function setNearbyBtn() { $('#nearbyBtn').classList.toggle('active', !!nearby); }
 
-function clearAlong() {
-  alongToken++;
-  const had = along;
-  along = null;
+function clearNearby(onlyRoute = false) {
+  if (onlyRoute && nearby?.mode !== 'route') return;
+  nearbyToken++;
+  const had = nearby;
+  nearby = null;
   had?.layer.remove();
-  if (had) renderAlong();
+  setNearbyBtn();
 }
 
-async function searchAlong(key) {
-  if (along?.key === key) return clearAlong();
-  const route = options[selected]?.route;
-  if (!route) return;
-  clearAlong();
-  const token = alongToken, a = ALONG[key];
-  along = { key, layer: L.layerGroup().addTo(map) };
-  const layer = along.layer;
-  renderAlong();
-  let pts = simplify(route.coords, 40);
-  for (let tol = 80; pts.length > 120; tol *= 1.6) pts = simplify(route.coords, tol);
-  const poly = pts.map(p => `${p[0].toFixed(5)},${p[1].toFixed(5)}`).join(',');
-  let els;
+function hideNearbyMenu() {
+  const menu = $('#nearbyMenu');
+  if (menu.hidden || menu.classList.contains('leaving')) return false;
+  $('#nearbyBtn').setAttribute('aria-expanded', 'false');
+  if (reduceMotion()) { menu.hidden = true; return true; }
+  menu.classList.add('leaving');
+  setTimeout(() => { if (menu.classList.contains('leaving')) { menu.hidden = true; menu.classList.remove('leaving'); } }, 160);
+  return true;
+}
+
+function toggleNearbyMenu() {
+  const menu = $('#nearbyMenu');
+  if (hideNearbyMenu()) return;
+  $('#bikeMenu').hidden = true;
+  menu.innerHTML = Object.entries(NEARBY).map(([k, n]) => `<button role="menuitem" data-k="${k}" class="${nearby?.key === k ? 'current' : ''}">${icon(n.ic, 22)}<span><b>${esc(t(n.label))}</b></span></button>`).join('')
+    + (nearby ? `<button role="menuitem" data-k="" class="nearby-clear">${icon('close', 22)}<span><b>${esc(t('Clear'))}</b></span></button>` : '');
+  menu.classList.remove('leaving');
+  menu.hidden = false;
+  const r = $('#nearbyBtn').getBoundingClientRect();
+  menu.style.top = `${Math.max(8, Math.min(r.top, innerHeight - menu.offsetHeight - 12))}px`;
+  $('#nearbyBtn').setAttribute('aria-expanded', 'true');
+  menu.querySelectorAll('button').forEach(b => b.onclick = () => { hideNearbyMenu(); b.dataset.k ? searchNearby(b.dataset.k) : clearNearby(); });
+}
+
+// Bounding boxes ([w, s, e, n]) to ask Nominatim about: one for the area, or a few along a long route.
+function routeBoxes(route) {
+  const chunks = Math.min(4, Math.max(1, Math.ceil(route.length / 6000)));
+  const padLat = NEARBY_ROUTE * 1.4 / 111320, boxes = [];
+  for (let c = 0; c < chunks; c++) {
+    const a = route.length * c / chunks, b = route.length * (c + 1) / chunks;
+    let w = 181, s = 91, e = -181, n = -91;
+    route.coords.forEach((p, i) => {
+      if (route.cum[i] < a - 1 || route.cum[i] > b + 1) return;
+      w = Math.min(w, p[1]); e = Math.max(e, p[1]); s = Math.min(s, p[0]); n = Math.max(n, p[0]);
+    });
+    if (w > e) continue;
+    const padLon = padLat / Math.cos((s + n) / 2 * Math.PI / 180);
+    boxes.push([w - padLon, s - padLat, e + padLon, n + padLat]);
+  }
+  return boxes;
+}
+
+async function nominatimBox(n, [w, s, e, nn]) {
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(n.q)}&viewbox=${w.toFixed(5)},${nn.toFixed(5)},${e.toFixed(5)},${s.toFixed(5)}&bounded=1&limit=40`;
+  const r = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('nominatim ' + r.status);
+  return (await r.json()).filter(x => `${x.category}/${x.type}` === n.type);
+}
+
+async function searchNearby(key) {
+  if (nearby?.key === key) return clearNearby();
+  const n = NEARBY[key], route = options[selected]?.route;
+  if (!navigator.onLine) return toast(t('Finding places nearby needs a connection'));
+  clearNearby();
+  const token = nearbyToken, mode = route ? 'route' : 'around';
+  const origin = me?.latlng || [map.getCenter().lat, map.getCenter().lng];
+  nearby = { key, mode, layer: L.layerGroup().addTo(map) };
+  setNearbyBtn();
+  toast(t('Searching…'));
+  let boxes;
+  if (route) boxes = routeBoxes(route);
+  else {
+    const dLat = NEARBY_AROUND / 111320, dLon = dLat / Math.cos(origin[0] * Math.PI / 180);
+    boxes = [[origin[1] - dLon, origin[0] - dLat, origin[1] + dLon, origin[0] + dLat]];
+  }
+  const seen = new Map();
   try {
-    els = await overpass(`[out:json][timeout:12];nwr[${a[2]}](around:150,${poly});out center 120;`);
+    for (let i = 0; i < boxes.length; i++) {
+      if (i) await sleep(1100);
+      const res = await nominatimBox(n, boxes[i]);
+      if (token !== nearbyToken) return;
+      res.forEach(x => seen.set(x.osm_type + x.osm_id, x));
+    }
   } catch {
-    if (token === alongToken) { clearAlong(); toast(t('Search along the route needs a connection')); }
+    if (token === nearbyToken) { clearNearby(); toast(t('Finding places nearby needs a connection')); }
     return;
   }
-  if (token !== alongToken) return;
   const found = [];
-  for (const el of els) {
-    const ll = [el.lat ?? el.center?.lat, el.lon ?? el.center?.lon];
-    if (ll[0] == null) continue;
-    let best = { d: Infinity, m: 0 };
-    for (let i = 0; i < route.coords.length - 1; i++) {
-      const r = projectOnSegment(ll, route.coords[i], route.coords[i + 1]);
-      if (r.d < best.d) best = { d: r.d, m: route.cum[i] + r.t * (route.cum[i + 1] - route.cum[i]) };
+  for (const x of seen.values()) {
+    const ll = [+x.lat, +x.lon];
+    if (route) {
+      let best = { d: Infinity, m: 0 };
+      for (let i = 0; i < route.coords.length - 1; i++) {
+        const r = projectOnSegment(ll, route.coords[i], route.coords[i + 1]);
+        if (r.d < best.d) best = { d: r.d, m: route.cum[i] + r.t * (route.cum[i + 1] - route.cum[i]) };
+      }
+      if (best.d <= NEARBY_ROUTE) found.push({ ll, m: best.m, name: x.name });
+    } else {
+      const d = dist(ll, origin);
+      if (d <= NEARBY_AROUND) found.push({ ll, m: d, name: x.name });
     }
-    if (best.d <= 170) found.push({ ll, m: best.m, name: el.tags?.name });
   }
-  found.sort((x, y) => x.m - y.m);
-  if (!found.length) { clearAlong(); toast(t('Nothing found within 150 m of the route')); return; }
-  for (const f of found.slice(0, 30)) {
-    L.marker(f.ll, { icon: L.divIcon({ className: 'along-icon', html: `<span>${a[0]}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 200 })
-      .on('click', () => openPlacePopup(f.ll, f.name || t(a[1]), t('{0} along the route', fmtDist(f.m)), 'via'))
-      .addTo(layer);
-  }
+  found.sort((p, q) => p.m - q.m);
+  if (!found.length) { clearNearby(); toast(t('Nothing found nearby')); return; }
+  const shown = found.slice(0, 40);
+  shown.forEach((f, i) => {
+    const sub = route ? t('{0} along the route', fmtDist(f.m)) : t('{0} from here', fmtDist(f.m));
+    L.marker(f.ll, { icon: L.divIcon({ className: 'nearby-icon', html: `<span style="animation-delay:${Math.min(i, 12) * 30}ms">${icon(n.ic, 18)}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 200 })
+      .on('click', () => openPlaceSheet(f.ll, f.name || t(n.label), f.name ? `${t(n.label)} · ${sub}` : sub, f.name ? true : key === 'parking' ? 'bicycle_parking' : false))
+      .addTo(nearby.layer);
+  });
+  toast(shown.length === 1 ? t('One {0} nearby', t(n.label).toLowerCase()) : t('{0} {1} nearby', shown.length, t(n.many)));
+  const pts = shown.map(f => f.ll);
+  if (!route) pts.push(origin);
+  const bounds = L.latLngBounds(pts);
+  if (!map.getBounds().contains(bounds)) map.fitBounds(bounds, { paddingTopLeft: [30, 120], paddingBottomRight: [70, route ? 300 : 120], maxZoom: 17 });
+}
+
+// ---- "More": the less-used map buttons fold away behind one button
+var moreOpen = false;
+function syncMoreDot() { $('#moreBtn .more-dot').hidden = moreOpen || !$('#radarBtn').classList.contains('active'); }
+function setMore(on) {
+  if (on === moreOpen) return;
+  moreOpen = on;
+  $('#moreBtns').classList.toggle('open', on);
+  $('#moreBtns').inert = !on;
+  $('#moreBtn').setAttribute('aria-expanded', on);
+  $('#moreBtn .ic-more').setAttribute('d', on ? ICON_PATHS.close : ICON_PATHS.more_horiz);
+  syncMoreDot();
 }
 
 // ---- shaping the route by hand (via points)
@@ -1618,7 +1703,7 @@ function drawEndpoints(a, b) {
 
 function clearRoutes() {
   planToken++;
-  clearAlong();
+  clearNearby(true);
   scheduleSession();
   options = [];
   vias = [];
@@ -1734,6 +1819,8 @@ function setupButtons() {
   };
   document.querySelectorAll('.lockBtn').forEach(b => b.onclick = lockScreen);
   $('#radarBtn').onclick = () => toggleRadar();
+  $('#nearbyBtn').onclick = toggleNearbyMenu;
+  $('#moreBtn').onclick = () => setMore(!moreOpen);
   $('#placeClose').onclick = closePlaceSheet;
   setupFullscreen();
   setupLock();
@@ -3308,6 +3395,8 @@ function handleBack() {
   if (!$('#dialog').hidden) { closeDialog(); return true; }
   if (!$('#settings').hidden) { closeSettings(); return true; }
   if (!$('#bikeMenu').hidden) { $('#bikeMenu').hidden = true; return true; }
+  if (hideNearbyMenu()) return true;
+  if (moreOpen) { setMore(false); return true; }
   if (!$('#suggestions').hidden) { hideSuggestions(); document.activeElement?.blur(); return true; }
   if (nav) { openEndSheet(); return true; }
   if (to) { $('#clearBtn').click(); return true; }
