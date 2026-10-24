@@ -263,8 +263,9 @@ function setupMap() {
   map.on('zoomend', () => {
     syncGL();
     // A pinch while following sets your own zoom level for the rest of the ride.
-    if (nav?.follow && nav.wantZoom != null && Math.abs(map.getZoom() - nav.wantZoom) > 0.05) nav.userZoom = map.getZoom();
-    if (!nav && fol.mode && !fol.paused && fol.wantZoom != null && Math.abs(map.getZoom() - fol.wantZoom) > 0.05) fol.userZoom = map.getZoom();
+    // A pinch while following becomes your preferred zoom (remembered, and still speed-aware).
+    if (nav?.follow && nav.wantZoom != null && Math.abs(map.getZoom() - nav.wantZoom) > 0.05) addZoomBoost(map.getZoom() - nav.wantZoom);
+    if (!nav && fol.mode && !fol.paused && fol.wantZoom != null && Math.abs(map.getZoom() - fol.wantZoom) > 0.05) addZoomBoost(map.getZoom() - fol.wantZoom);
   });
   addEventListener('touchstart', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, { capture: true, passive: true });
   addEventListener('mousedown', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, true);
@@ -531,13 +532,11 @@ function followStep(fix, force) {
   }
   if (!fol.mode || fol.paused) return;
   if (fol.mode === 2) rotateMap();
-  let z = fol.userZoom ?? map.getZoom();
-  if (fol.userZoom == null) {
-    if (fix.speed != null && fix.speed > 1.5) {
-      z = kmh < 12 ? 17.25 : kmh < 22 ? 16.75 : 16.25;
-      if (Math.abs(z - map.getZoom()) < 0.3) z = map.getZoom();
-    } else if (force) z = Math.max(z, 16);
-  }
+  let z = map.getZoom();
+  if (fix.speed != null && fix.speed > 1.5) {
+    z = (kmh < 12 ? 17.25 : kmh < 22 ? 16.75 : 16.25) + zoomBoost();
+    if (Math.abs(z - map.getZoom()) < 0.3) z = map.getZoom();
+  } else if (force) z = Math.max(z, 16 + zoomBoost());
   fol.wantZoom = z;
   let c = fix.latlng;
   if (fol.mode === 2) { // rider at about 60% of the height: more road ahead
@@ -1833,17 +1832,19 @@ function setupTwist() {
 function followCamera(fix, st) {
   rotateMap();
   if (!nav.follow) return;
-  let z = nav.userZoom ?? map.getZoom();
-  if (nav.userZoom == null) {
-    // Further out when riding fast, close in just before a turn.
-    const kmh = (fix.speed ?? 0) * 3.6;
-    z = kmh < 12 ? 17.25 : kmh < 22 ? 16.75 : 16.25;
-    if (st?.next && st.distToNext < 150) z = 17.5;
-    if (Math.abs(z - map.getZoom()) < 0.3) z = map.getZoom();
-  }
+  // Further out when riding fast, close in just before a turn; plus your own preference.
+  const kmh = (fix.speed ?? 0) * 3.6;
+  let z = (kmh < 12 ? 17.25 : kmh < 22 ? 16.75 : 16.25) + zoomBoost();
+  if (st?.next && st.distToNext < 150) z = Math.max(z, 17.5 + zoomBoost());
+  if (Math.abs(z - map.getZoom()) < 0.3) z = map.getZoom();
   nav.wantZoom = z;
   // pan at the same steady pace as the marker glides, so it stays put on screen
   map.setView(fix.latlng, z, { animate: true, pan: { duration: meGlide.ms / 1000, easeLinearity: 1 } });
+}
+
+const zoomBoost = () => S().zoomBoost || 0;
+function addZoomBoost(d) {
+  store.update(s => { s.zoomBoost = Math.max(-2, Math.min(3, Math.round(((s.zoomBoost || 0) + d) * 4) / 4)); });
 }
 
 function recenter() {
