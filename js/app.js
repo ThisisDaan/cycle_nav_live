@@ -15,6 +15,7 @@ import { refreshOfflineSegments, routingMode } from './router.js';
 import { adviseHere, adviseRide } from './weather.js';
 import { createRainFx } from './rainfx.js';
 import { cachedPlace, detailsHtml, isStation, lookupPlace, placeLinks, trainPlanner } from './placeinfo.js';
+import { icon, ICON_PATHS } from './icons.js';
 import { LANGUAGES, language, startTranslating, t } from './i18n.js';
 import { bearing, dist, fmtClock, fmtDist, fmtDuration, projectOnSegment, resample, simplify } from './geo.js';
 
@@ -370,7 +371,7 @@ function syncBikeLayers(gl) {
   gl.setLayoutProperty('unpaved-mtb', 'visibility', mtb ? 'visible' : 'none');
 }
 
-const BADGES = { bicycle_parking: ['P', '#1a73e8'], bicycle: ['🔧', '#e8710a'], drinking_water: ['💧', '#0b8ec9'], toilets: ['🚻', '#6b5bd2'], train: ['🚆', '#1f4e8c'] };
+const BADGES = { bicycle_parking: ['P', '#1a73e8'], bicycle: ['build', '#e8710a'], drinking_water: ['water', '#0b8ec9'], toilets: ['wc', '#6b5bd2'], train: ['train', '#1f4e8c'] };
 function bikeBadge(gl, id) {
   const b = BADGES[id.replace(/^bk-/, '')];
   if (!b || gl.hasImage(id)) return;
@@ -382,7 +383,7 @@ function bikeBadge(gl, id) {
   g.lineWidth = 2.5; g.strokeStyle = b[1]; g.stroke();
   g.textAlign = 'center'; g.textBaseline = 'middle';
   if (b[0] === 'P') { g.fillStyle = b[1]; g.font = 'bold 19px sans-serif'; g.fillText('P', 16, 17); }
-  else { g.font = '16px sans-serif'; g.fillText(b[0], 16, 17); }
+  else { g.save(); g.translate(16 - 9, 16 - 9); g.scale(18 / 24, 18 / 24); g.fillStyle = b[1]; g.fill(new Path2D(ICON_PATHS[b[0]])); g.restore(); }
   gl.addImage(id, g.getImageData(0, 0, c.width, c.height), { pixelRatio: r });
 }
 
@@ -469,8 +470,8 @@ function openPlaceSheet(latlng, name, sub, lookup, station = false) {
     const l = placeLinks(tags);
     const saved = (S().pins || []).some(p => dist(p.latlng, latlng) < 30);
     // one row on every card: links turn icon-only when there are several, so Directions never wraps
-    const links = [l.tel && [l.tel, '📞', t('Call'), ''], l.site && [l.site, '🌐', t('Website'), ' target="_blank" rel="noopener noreferrer"'],
-      (station || isStation(tags)) && [trainPlanner(name, latlng, tags?.['addr:country']), '🚆', t('Trains'), ' target="_blank" rel="noopener noreferrer"']].filter(Boolean);
+    const links = [l.tel && [l.tel, icon('phone'), t('Call'), ''], l.site && [l.site, icon('language'), t('Website'), ' target="_blank" rel="noopener noreferrer"'],
+      (station || isStation(tags)) && [trainPlanner(name, latlng, tags?.['addr:country']), icon('train'), t('Trains'), ' target="_blank" rel="noopener noreferrer"']].filter(Boolean);
     const compact = links.length + (options.length ? 1 : 0) >= 2;
     $('#placeActions').innerHTML = `<button class="secondary-btn place-save${saved ? ' saved' : ''}" data-a="pin" title="${esc(t('Save as pin'))}" aria-label="${esc(t('Save as pin'))}">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG}</button>`
       + (options.length ? `<button class="secondary-btn" data-a="via">${esc(t('Via'))}</button>` : '')
@@ -872,8 +873,8 @@ function showSuggestions(which, q) {
   if (q.length >= 3) return; // a search is (or will be) running
   const items = [];
   if (which === 'from' || !from.isMe) items.push({ ...ME, icon: '◎', detail: me ? 'Use GPS' : 'Waiting for GPS…' });
-  if (which === 'to') items.push({ name: 'Follow a GPX route…', detail: 'Open a .gpx file and navigate along it', icon: '📂', action: 'gpx' });
-  const recent = S().recent.map(r => ({ ...r, icon: '🕘', recent: true }));
+  if (which === 'to') items.push({ name: 'Follow a GPX route…', detail: 'Open a .gpx file and navigate along it', icon: icon('folder_open', 20), action: 'gpx' });
+  const recent = S().recent.map(r => ({ ...r, icon: icon('history', 20), recent: true }));
   renderSuggestions(which, [...items, ...recent], '', recent.length ? 'Recent' : '');
 }
 
@@ -884,7 +885,7 @@ function renderSuggestions(which, items, extraHtml = '', head = '') {
   let html = extraHtml;
   suggestionItems.forEach((it, i) => {
     if (head && i === suggestionItems.findIndex(x => x.recent)) html += `<li class="s-head">${esc(head)}</li>`;
-    html += `<li data-i="${i}"><span class="s-icon">${it.icon || '📍'}</span><span class="s-text"><div class="s-name">${esc(it.name)}</div>${it.detail ? `<div class="s-detail">${esc(it.detail)}</div>` : ''}</span>${(it.latlng || it.isMe) && !it.recent ? `${pinBtn(it)}` : ''}</li>`;
+    html += `<li data-i="${i}"><span class="s-icon">${it.icon || icon('place', 20)}</span><span class="s-text"><div class="s-name">${esc(it.name)}</div>${it.detail ? `<div class="s-detail">${esc(it.detail)}</div>` : ''}</span>${(it.latlng || it.isMe) && !it.recent ? `${pinBtn(it)}` : ''}</li>`;
   });
   ul.innerHTML = html;
   ul.hidden = !html;
@@ -1133,7 +1134,7 @@ function safetyHtml(r) {
   if (r.stats.signals) extra.push(r.stats.signals > 1 ? t('{0} traffic lights', r.stats.signals) : t('1 traffic light'));
   if (r.stats.risky) extra.push(r.stats.risky > 1 ? t('{0} risky crossings', r.stats.risky) : t('1 risky crossing'));
   const busy = r.longestBusy && m.busy >= 200
-    ? `<div class="rc-warn" role="button">⚠ ${t('{0} busy road without bike lane', fmtDist(m.busy))}</div>` : '';
+    ? `<div class="rc-warn" role="button">${icon('warning', 16)} ${t('{0} busy road without bike lane', fmtDist(m.busy))}</div>` : '';
   return `<div class="bar">${bar}</div>
       <div class="rc-safety"><span>${txt}${extra.length ? `<br>${extra.join(' · ')}` : ''}</span><span class="rc-legend" role="button" aria-label="${t('Colour legend')}">?</span></div>${busy}`;
 }
@@ -1336,14 +1337,14 @@ function enableLineDrag(el, route) {
 
 // ---- search along the route (Overpass): cafés, toilets, drinking water, bike shops within 150 m
 const ALONG = {
-  cafe: ['☕', 'Café', '"amenity"="cafe"'], toilets: ['🚻', 'Toilet', '"amenity"="toilets"'],
-  water: ['💧', 'Drinking water', '"amenity"="drinking_water"'], bike: ['🔧', 'Bike shop', '"shop"="bicycle"'],
+  cafe: ['cafe', 'Café', '"amenity"="cafe"'], toilets: ['wc', 'Toilet', '"amenity"="toilets"'],
+  water: ['water', 'Drinking water', '"amenity"="drinking_water"'], bike: ['build', 'Bike shop', '"shop"="bicycle"'],
 };
 var along = null, alongToken = 0;
 
 function renderAlong() {
   const row = $('#alongRow');
-  row.innerHTML = Object.entries(ALONG).map(([k, a]) => `<button class="along-chip${along?.key === k ? ' on' : ''}" data-k="${k}"><span>${a[0]}</span> ${t(a[1])}</button>`).join('');
+  row.innerHTML = Object.entries(ALONG).map(([k, a]) => `<button class="along-chip${along?.key === k ? ' on' : ''}" data-k="${k}">${icon(a[0], 16)} ${t(a[1])}</button>`).join('');
   row.querySelectorAll('button').forEach(b => b.onclick = () => searchAlong(b.dataset.k));
 }
 
@@ -1488,7 +1489,7 @@ function renderViaRows() {
     + shown.map((v, n) => `<div class="planner-row via-row">
       <span class="pin-via">${viaLetter(n)}</span>
       <span class="via-name selectable">${v.name ? `${esc(v.name)} <small>${esc(v.city || '')}</small>` : `${t('Point {0}', viaLetter(n))} <small>${t('finding name…')}</small>`}</span>
-      <button class="icon-btn" data-unvia="${n}" title="Remove this point" aria-label="Remove point ${viaLetter(n)}">✕</button>
+      <button class="icon-btn" data-unvia="${n}" title="Remove this point" aria-label="Remove point ${viaLetter(n)}">${icon('close', 20)}</button>
     </div>`).join('');
   const fold = box.querySelector('.via-fold[aria-expanded="true"]');
   if (fold) fold.onclick = () => { viaRowsOpen = false; renderViaRows(); };
@@ -1644,7 +1645,7 @@ async function wxUpdate() {
 }
 
 function wxLine(a) {
-  return `<span class="wx-ic">${a.icon}</span><span class="wx-tx">${esc(a.text)}${a.hint ? `<small>${esc(a.hint)}</small>` : ''}</span>`;
+  return `<span class="wx-ic">${icon(a.icon, 22)}</span><span class="wx-tx">${esc(a.text)}${a.hint ? `<small>${esc(a.hint)}</small>` : ''}</span>`;
 }
 
 function wxRender() {
@@ -1677,7 +1678,7 @@ function showWxPop() {
       <div class="wx-slot"><i ${h ? `style="height:${Math.max(5, h * 100)}%"` : 'class="dry"'}></i></div><b>${i % 6 === 0 ? fmtClock(new Date(b.t)) : ''}</b></div>`;
   }).join('');
   const facts = [];
-  if (a.cur?.temp != null) facts.push(`🌡 ${Math.round(a.cur.temp)}°`);
+  if (a.cur?.temp != null) facts.push(`${icon('thermostat', 15)} ${Math.round(a.cur.temp)}°`);
   if (a.cur?.speed != null) facts.push(`<span class="wx-arrow" style="transform:rotate(${Math.round(a.cur.dir + 180)}deg)">↑</span> ${t('Wind {0} Bft', a.wind?.bft ?? '–')} · ${Math.round(a.cur.speed * 3.6)} km/h`);
   pop.innerHTML = `<div class="wx-card" role="dialog">
     <div class="wx-head ${`wx-${a.kind}`}">${wxLine(a)}</div>
@@ -2080,7 +2081,7 @@ function rotateMap() {
   const btn = $('#orientBtn');
   btn.title = `Map: ${ORIENTATIONS[S().orientation].label}`;
   btn.innerHTML = compassSvg(-mapRotation, nav?.manual != null)
-    + `<small>${nav?.manual != null ? '✋' : { course: '', north: 'N', compass: '🧭' }[S().orientation]}</small>`;
+    + `<small>${nav?.manual != null ? icon('pan_tool', 10) : { course: '', north: 'N', compass: icon('explore', 10) }[S().orientation]}</small>`;
 }
 
 const compassSvg = (deg, manual) => `<svg viewBox="0 0 24 24" width="26" height="26" style="transform:rotate(${deg}deg)"><path d="M12 2l4 10h-8z" fill="var(--danger)"/><path d="M12 22l-4-10h8z" fill="currentColor" opacity=".45"/></svg>`;
@@ -2251,7 +2252,7 @@ function renderNavDetails() {
   const stops = nav.vias.filter(v => v.stop);
   $('#ndStops').innerHTML = stops.map((v, i) => `<div class="list-item"><span class="nd-stop-pin">${i + 1}</span>
     <div class="li-main"><div class="li-title selectable">${esc(v.stop.name)}</div><div class="li-sub">${t('{0} away', fmtDist(Math.max(0, alongRoute(nav.route, v) - nav.along)))}</div></div>
-    <button class="icon-btn" data-unstop="${i}" aria-label="Remove stop">✕</button></div>`).join('');
+    <button class="icon-btn" data-unstop="${i}" aria-label="Remove stop">${icon('close', 20)}</button></div>`).join('');
   $('#ndStops').querySelectorAll('[data-unstop]').forEach(b => b.onclick = () => removeStop(stops[+b.dataset.unstop]));
 
   const { cum, hints } = nav.route;
@@ -2273,7 +2274,7 @@ function setupStopSearch() {
       abort?.abort();
       abort = new AbortController();
       try { results = await search(q, me?.latlng, abort.signal); } catch { return; }
-      ul.innerHTML = results.map((p, i) => `<li data-i="${i}"><span class="s-icon">📍</span><span class="s-text"><div class="s-name">${esc(p.name)}</div>${p.detail ? `<div class="s-detail">${esc(p.detail)}</div>` : ''}</span></li>`).join('')
+      ul.innerHTML = results.map((p, i) => `<li data-i="${i}"><span class="s-icon">${icon('place', 20)}</span><span class="s-text"><div class="s-name">${esc(p.name)}</div>${p.detail ? `<div class="s-detail">${esc(p.detail)}</div>` : ''}</span></li>`).join('')
         || '<li class="s-head">Nothing found</li>';
       ul.hidden = false;
       ul.querySelectorAll('li[data-i]').forEach(li => li.onclick = () => addStop(results[+li.dataset.i]));
@@ -2456,7 +2457,7 @@ function offerSaveRide(session, arrived) {
   const rec = session.recorder;
   const bike = store.activeBike();
   openDialog(`
-    <h2>${arrived ? 'You made it! 🎉' : 'Save this ride?'}</h2>
+    <h2>${arrived ? 'You made it!' : 'Save this ride?'}</h2>
     <p>${session.sim ? 'This was a simulated demo ride — you probably want to discard it.' : 'Saved rides teach Cycle Nav your favourite ways and your real speed.'}</p>
     <div class="stat-row">
       <div><b>${fmtDist(rec.distance)}</b><span>distance</span></div>
@@ -2847,16 +2848,16 @@ function renderDrawer() {
   if (tab === 'pins') {
     html = items.map(p => row(p.id, `<span class="srow-ic">${esc(p.emoji)}</span>`, p.name,
       [me ? esc(t('{0} from you', fmtDist(dist(me.latlng, p.latlng)))) : '', esc(p.note || '')].filter(Boolean).join(' · ') || esc(t('Pin')),
-      (navStop ? act('stop', '＋ ' + t('Add as stop'), 'go') : nav ? '' : act('to', '➜ ' + t('Directions to here'), 'go')) +
-      act('show', p.show ? '👁' : '🚫', 'ic ' + (p.show ? 'on' : ''), p.show ? t('Shown on map') : t('Hidden on map')) +
-      act('edit', '✎', 'ic', t('Edit')) + act('del', '🗑', 'ic danger', t('Delete')))).join('');
+      (navStop ? act('stop', icon('add', 16) + ' ' + t('Add as stop'), 'go') : nav ? '' : act('to', icon('directions', 16) + ' ' + t('Directions to here'), 'go')) +
+      act('show', icon(p.show ? 'visibility' : 'visibility_off', 20), 'ic ' + (p.show ? 'on' : ''), p.show ? t('Shown on map') : t('Hidden on map')) +
+      act('edit', icon('edit', 20), 'ic', t('Edit')) + act('del', icon('delete', 20), 'ic danger', t('Delete')))).join('');
   } else {
     html = items.map(r => {
       const b = S().bikes.find(x => x.id === r.bikeId);
       const badge = `<span class="srow-ic" style="--bike:${esc(b?.color || '#888')}">${esc(b?.icon || '🚲')}</span>`;
       const speed = tab === 'rides' && r.movingTime ? ` · ${(r.distance / r.movingTime * 3.6).toFixed(1)} km/h` : '';
       return row(r.id, badge, r.name || t('Ride'), `${esc(fmtDist(r.distance))} · ${esc(dFmtDate(r.startedAt))}${speed}`,
-        (nav ? '' : act('ride', '▶ ' + t('Ride it'), 'go')) + act('rename', '✎', 'ic', t('Rename')) + act('gpx', 'GPX', '', t('Export GPX')) + act('del', '🗑', 'ic danger', t('Delete')));
+        (nav ? '' : act('ride', icon('play', 16) + ' ' + t('Ride it'), 'go')) + act('rename', icon('edit', 20), 'ic', t('Rename')) + act('gpx', 'GPX', '', t('Export GPX')) + act('del', icon('delete', 20), 'ic danger', t('Delete')));
     }).join('');
   }
   if (!items.length) {
@@ -2865,13 +2866,13 @@ function renderDrawer() {
       routes: t('No saved routes yet. Plan a route and tap the bookmark button to keep it here.'),
       rides: t('No rides yet. Navigate somewhere, or tap the red record button and ride your favourite way.'),
     })[tab];
-    html = `<div class="drawer-empty"><div class="de-ic">${total ? '🔍' : { pins: '📍', routes: '🗺️', rides: '🚲' }[tab]}</div><p>${esc(hint)}</p></div>`;
+    html = `<div class="drawer-empty"><div class="de-ic">${icon(total ? 'search' : { pins: 'place', routes: 'map', rides: 'bike' }[tab], 52)}</div><p>${esc(hint)}</p></div>`;
   }
   $('#drawerList').innerHTML = html;
   $('#drawerSearch').placeholder = t('Search saved');
   $('#drawerSearchBox').hidden = !total;
   $('#drawerFoot').innerHTML = tab === 'pins'
-    ? `<button class="secondary-btn" data-f="here">📌 ${esc(t('Save my location'))}</button>`
+    ? `<button class="secondary-btn" data-f="here">${icon('push_pin', 18)} ${esc(t('Save my location'))}</button>`
     : `<button class="secondary-btn" data-f="import">${esc(t('Import GPX rides'))}</button><button class="secondary-btn" data-f="follow">${esc(t('Navigate a GPX route'))}</button>`;
 }
 

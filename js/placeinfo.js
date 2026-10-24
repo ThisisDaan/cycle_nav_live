@@ -1,6 +1,7 @@
 // Online details for a tapped place: OSM tags from Nominatim, rendered as compact popup rows.
 
 import { t } from './i18n.js';
+import { icon } from './icons.js';
 import { DAY_NAMES, formatStatus, hoursStatus, parseHours, weekStrings } from './hours.js';
 
 const cache = new Map();
@@ -68,11 +69,11 @@ export function website(v) {
 
 function hoursHtml(raw) {
   const week = parseHours(raw);
-  if (!week) return `<div class="pp-row"><span class="pp-ic">🕒</span><span class="selectable">${esc(raw)}</span></div>`;
+  if (!week) return `<div class="pp-row"><span class="pp-ic">${icon('schedule', 16)}</span><span class="selectable">${esc(raw)}</span></div>`;
   const status = formatStatus(hoursStatus(week), t);
   const today = (new Date().getDay() + 6) % 7;
   const rows = weekStrings(week, t('Closed')).map((s, i) => `<div class="${i === today ? 'pp-today' : ''}"><span>${esc(t(DAY_NAMES[i].slice(0, 3)))}</span><span>${esc(s === '24h' ? t('Open 24/7') : s)}</span></div>`).join('');
-  return `<details class="pp-row pp-hours"><summary data-show="${esc(t('All hours'))}" data-hide="${esc(t('Hide'))}"><span class="pp-ic">🕒</span><span>${esc(status)}</span></summary><div class="pp-week">${rows}</div></details>`;
+  return `<details class="pp-row pp-hours"><summary data-show="${esc(t('All hours'))}" data-hide="${esc(t('Hide'))}"><span class="pp-ic">${icon('schedule', 16)}</span><span>${esc(status)}</span></summary><div class="pp-week">${rows}</div></details>`;
 }
 
 export const isStation = tags => ['station', 'halt'].includes(tags?.railway) || tags?.public_transport === 'station' && tags?.train === 'yes';
@@ -105,21 +106,21 @@ export function detailsHtml(tags) {
     const bits = [kind && t(kind), tags.supervised === 'yes' && t('Guarded'), tags.covered === 'yes' && t('Covered'),
       tags.fee === 'yes' ? t('Paid') : tags.fee === 'no' && t('Free'), tags.capacity && t('{0} spaces', Number(tags.capacity).toLocaleString())].filter(Boolean);
     const secure = tags.supervised === 'yes' || ['building', 'lockers'].includes(tags.bicycle_parking);
-    if (bits.length) out.push(row(secure ? '🔒' : '🅿️', esc(bits.join(' · '))));
-    if (tags.operator) out.push(row('🏢', esc(tags.operator)));
+    if (bits.length) out.push(row(icon(secure ? 'lock' : 'parking', 16), esc(bits.join(' · '))));
+    if (tags.operator) out.push(row(icon('business', 16), esc(tags.operator)));
   }
   if (tags.opening_hours) out.push(hoursHtml(tags.opening_hours));
   const street = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
   const city = tags['addr:city'] || tags['addr:postcode'];
   const addr = [street, city].filter(Boolean).join(', ');
-  if (addr) out.push(row('📍', `<span class="selectable">${esc(addr)}</span>`));
+  if (addr) out.push(row(icon('place', 16), `<span class="selectable">${esc(addr)}</span>`));
   // phone and website are buttons on the card, not rows
   const cu = (tags.cuisine || '').split(';').filter(Boolean).map(c => t(CUISINE[c.trim()] || pretty(c)));
   const dv = tags['diet:vegan'];
   if (dv === 'only') cu.push(t('Vegan')); else if (dv === 'yes') cu.push(t('Vegan options'));
-  if (cu.length) out.push(row('🍽️', esc(cu.join(', '))));
-  if (tags.outdoor_seating === 'yes') out.push(row('☀️', esc(t('Outdoor seating'))));
+  if (cu.length) out.push(row(icon('restaurant', 16), esc(cu.join(', '))));
+  if (tags.outdoor_seating === 'yes') out.push(row(icon('sunny', 16), esc(t('Outdoor seating'))));
   const wc = { yes: 'Wheelchair accessible', limited: 'Partly wheelchair accessible', no: 'Not wheelchair accessible' }[tags.wheelchair];
-  if (wc) out.push(row('♿', esc(t(wc))));
+  if (wc) out.push(row(icon('accessible', 16), esc(t(wc))));
   return out.length ? `<div class="pp-details">${out.join('')}</div>` : '';
 }

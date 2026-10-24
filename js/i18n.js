@@ -81,7 +81,7 @@ const NL = {
   'Edit pin': 'Pin bewerken',
   'Delete this pin?': 'Deze pin verwijderen?',
   '📌 Save as pin': '📌 Bewaar als pin',
-  '📌 Save my location': '📌 Bewaar mijn locatie',
+  'Save my location': 'Bewaar mijn locatie',
   'Save as pin': 'Bewaar als pin',
   'Emoji': 'Emoji',
   'Any emoji': 'Een willekeurige emoji',
@@ -290,7 +290,7 @@ const NL = {
   'Go through the roundabout': 'Ga over de rotonde',
 
   // rides
-  'You made it! 🎉': 'Gelukt! 🎉',
+  'You made it!': 'Gelukt!',
   'Save this ride?': 'Deze rit opslaan?',
   'This was a simulated demo ride — you probably want to discard it.': 'Dit was een gesimuleerde demorit — die wil je waarschijnlijk weggooien.',
   'Saved rides teach Cycle Nav your favourite ways and your real speed.': 'Opgeslagen ritten leren Cycle Nav je favoriete routes en je echte snelheid.',

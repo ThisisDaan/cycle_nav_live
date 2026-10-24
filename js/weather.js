@@ -204,18 +204,18 @@ export function computeAdvice(route, wx, now, durSec) {
     if (tight) {
       const f = tight.p.frac;
       const where = f < 0.1 ? t('the start') : f > 0.9 ? t('your destination') : t('{0} km in', Math.round(f * total / 1000));
-      if (tight.m < 0) return { ...base, icon: '🧥', kind: 'close', text: t('Probably dry – rain clears at {0} only {1} before you get there, keep a jacket handy', where, mins(-tight.m)) };
-      return { ...base, icon: '🏃', kind: 'rush', text: t('Leave now – rain reaches {0} around {1}, about {2} after you pass', where, clock(tight.at), mins(tight.m)) };
+      if (tight.m < 0) return { ...base, icon: 'jacket', kind: 'close', text: t('Probably dry – rain clears at {0} only {1} before you get there, keep a jacket handy', where, mins(-tight.m)) };
+      return { ...base, icon: 'run', kind: 'rush', text: t('Leave now – rain reaches {0} around {1}, about {2} after you pass', where, clock(tight.at), mins(tight.m)) };
     }
-    return { ...base, icon: '🟢', kind: 'go', text: t('Go now, dry all the way') };
+    return { ...base, icon: 'check_circle', kind: 'go', text: t('Go now, dry all the way') };
   }
   if (isLight(e0)) {
-    return { ...base, icon: '🧥', kind: 'jacket', text: t('Bring a jacket – light rain around {0}', clock(e0.first)) };
+    return { ...base, icon: 'jacket', kind: 'jacket', text: t('Bring a jacket – light rain around {0}', clock(e0.first)) };
   }
   const wait = ex.find(x => x.d > 0 && x.d <= MAX_WAIT && (isDry(x.e) || (isLight(x.e) && x.e.mm <= e0.mm * 0.25)));
-  if (wait) return { ...base, icon: '⏳', kind: 'wait', depart: now + wait.d * 60000, text: t('Wait {0} – dry from {1}', mins(wait.d), clock(now + wait.d * 60000)) };
-  if (e0.wetShare >= 0.7) return { ...base, icon: '🌧', kind: 'rain', text: t('Rain the whole ride – rain gear needed') };
-  return { ...base, icon: '🧥', kind: 'jacket', text: t('Bring a jacket – light rain around {0}', clock(e0.first)) };
+  if (wait) return { ...base, icon: 'hourglass', kind: 'wait', depart: now + wait.d * 60000, text: t('Wait {0} – dry from {1}', mins(wait.d), clock(now + wait.d * 60000)) };
+  if (e0.wetShare >= 0.7) return { ...base, icon: 'rain', kind: 'rain', text: t('Rain the whole ride – rain gear needed') };
+  return { ...base, icon: 'jacket', kind: 'jacket', text: t('Bring a jacket – light rain around {0}', clock(e0.first)) };
 }
 
 // route: { coords, cum, length }; durSec: expected ride time. Resolves to null when there is no data.
@@ -238,12 +238,12 @@ export async function adviseHere(latlng, now = Date.now()) {
   for (let m = 0; m <= 120; m += 5) slots.push(rainAt(c.rain, now + m * 60000));
   if (slots[0] >= WET) {
     const dry = slots.findIndex(v => v < WET);
-    return dry < 0 ? { ...base, icon: '🌧', kind: 'rain', text: t('Raining for the next two hours') }
-      : { ...base, icon: '🌧', kind: 'rain', text: t('Raining now, dry from {0}', clock(now + dry * 300000)) };
+    return dry < 0 ? { ...base, icon: 'rain', kind: 'rain', text: t('Raining for the next two hours') }
+      : { ...base, icon: 'rain', kind: 'rain', text: t('Raining now, dry from {0}', clock(now + dry * 300000)) };
   }
   const first = slots.findIndex(v => v >= WET);
-  if (first < 0 || first > 12) return { ...base, icon: '🟢', kind: 'go', text: t('Dry for the next hour') };
+  if (first < 0 || first > 12) return { ...base, icon: 'check_circle', kind: 'go', text: t('Dry for the next hour') };
   let end = first; while (end < slots.length && slots[end] >= WET) end++;
-  return { ...base, icon: '🌦', kind: 'soon', text: t('Rain in {0}, for about {1}', mins(first * 5), mins(Math.max(5, (end - first) * 5))) };
+  return { ...base, icon: 'cloud', kind: 'soon', text: t('Rain in {0}, for about {1}', mins(first * 5), mins(Math.max(5, (end - first) * 5))) };
 }
 
