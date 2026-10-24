@@ -128,6 +128,17 @@ export async function calmStyle(dark) {
     filter: ['in', ['get', 'class'], ['literal', BIKE_POI]],
     layout: { 'icon-image': ['concat', 'bk-', ['get', 'class']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 15, 0.6, 17, 0.85], 'icon-allow-overlap': false, 'icon-padding': 2, 'symbol-sort-key': ['get', 'rank'] },
   });
+  // Train stations stand out from town level, with their name once zoomed in a bit.
+  const font = style.layers.find(l => l.layout?.['text-font'])?.layout['text-font'];
+  style.layers.push({
+    id: 'train-stations', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 12,
+    filter: ['all', ['==', ['get', 'class'], 'railway'], ['in', ['get', 'subclass'], ['literal', ['station', 'halt']]]],
+    layout: {
+      'icon-image': 'bk-train', 'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.55, 16, 0.85], 'icon-allow-overlap': true, 'symbol-sort-key': ['get', 'rank'],
+      'text-field': ['step', ['zoom'], '', 13.5, ['get', 'name']], 'text-font': font, 'text-size': 12, 'text-offset': [0, 1.3], 'text-anchor': 'top', 'text-optional': true,
+    },
+    paint: { 'text-color': P.placeText, 'text-halo-color': P.halo, 'text-halo-width': 1.4 },
+  });
 
   // Fake building height for the tilted 3D view: stacked flat fills, shifted "up" on screen
   // (see applyBuildings). Hidden until the 3D view switches them on, so 2D looks as before.

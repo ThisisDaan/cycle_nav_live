@@ -370,7 +370,7 @@ function syncBikeLayers(gl) {
   gl.setLayoutProperty('unpaved-mtb', 'visibility', mtb ? 'visible' : 'none');
 }
 
-const BADGES = { bicycle_parking: ['P', '#1a73e8'], bicycle: ['🔧', '#e8710a'], drinking_water: ['💧', '#0b8ec9'], toilets: ['🚻', '#6b5bd2'] };
+const BADGES = { bicycle_parking: ['P', '#1a73e8'], bicycle: ['🔧', '#e8710a'], drinking_water: ['💧', '#0b8ec9'], toilets: ['🚻', '#6b5bd2'], train: ['🚆', '#1f4e8c'] };
 function bikeBadge(gl, id) {
   const b = BADGES[id.replace(/^bk-/, '')];
   if (!b || gl.hasImage(id)) return;
@@ -392,7 +392,7 @@ const POI_TYPES = {
   restaurant: 'Restaurant', fast_food: 'Fast food', bar: 'Bar', pub: 'Pub', supermarket: 'Supermarket', grocery: 'Grocery', bakery: 'Bakery',
   pharmacy: 'Pharmacy', hospital: 'Hospital', doctors: 'Doctor', dentist: 'Dentist', school: 'School', library: 'Library', post: 'Post office',
   bank: 'Bank', atm: 'ATM', fuel: 'Fuel station', parking: 'Parking', park: 'Park', playground: 'Playground', museum: 'Museum', hotel: 'Hotel',
-  bus: 'Bus stop', rail: 'Train station', airport: 'Airport', clothing_store: 'Clothes shop', florist: 'Florist', butcher: 'Butcher',
+  bus: 'Bus stop', rail: 'Train station', station: 'Station', halt: 'Station', airport: 'Airport', clothing_store: 'Clothes shop', florist: 'Florist', butcher: 'Butcher',
 };
 const poiType = p => { const k = POI_TYPES[p.subclass] || POI_TYPES[p.class] || (p.subclass || p.class || '').replace(/_/g, ' '); return t(k.charAt(0).toUpperCase() + k.slice(1)); };
 var lastCtx = 0;
@@ -400,7 +400,7 @@ var lastCtx = 0;
 function poiAt(e) {
   const gl = tiles?.getMaplibreMap?.();
   if (!gl) return null;
-  const layers = ['bike-essentials', 'poi_r1', 'poi_r7', 'poi_transit'].filter(id => gl.getLayer(id));
+  const layers = ['train-stations', 'bike-essentials', 'poi_r1', 'poi_r7', 'poi_transit'].filter(id => gl.getLayer(id));
   if (!layers.length) return null;
   const pt = gl.project([e.latlng.lng, e.latlng.lat]);
   let best = null;
@@ -447,7 +447,8 @@ function tapMap(e) {
   if (nav || picking || Date.now() - lastCtx < 700) return;
   if (e.originalEvent?.target?.closest?.('.leaflet-marker-icon, .leaflet-interactive, .leaflet-popup')) return;
   const hit = poiAt(e);
-  if (hit) openPlaceSheet(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', !!hit.p.name);
+  // named places are looked up by name; unnamed bike parking by type (to tell guarded garages from racks)
+  if (hit) openPlaceSheet(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', hit.p.name ? true : hit.p.class === 'bicycle_parking' && 'bicycle_parking');
   else closePlaceSheet();
 }
 
@@ -474,12 +475,12 @@ function openPlaceSheet(latlng, name, sub, lookup) {
       + `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
     $('#placeActions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => go(b.dataset.a));
   };
-  const cached = lookup ? cachedPlace(name, latlng) : null;
+  const cat = lookup === true ? null : lookup || null, cached = lookup ? cachedPlace(name, latlng, cat) : null;
   $('#placeBody').innerHTML = cached ? detailsHtml(cached.tags) : lookup ? `<small class="pp-loading">${esc(t('Loading details…'))}</small>` : '';
   render(cached?.tags);
   $('#placeSheet').classList.remove('leaving');
   $('#placeSheet').hidden = false;
-  if (lookup && !cached) lookupPlace(name, latlng).then(tags => {
+  if (lookup && !cached) lookupPlace(name, latlng, cat).then(tags => {
     if (placeSel?.token !== token) return;
     $('#placeBody').innerHTML = detailsHtml(tags); render(tags);
     $('#placeBody').animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });

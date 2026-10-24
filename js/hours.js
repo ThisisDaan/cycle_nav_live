@@ -27,6 +27,8 @@ export function parseHours(value) {
     rule = rule.trim().replace(/\s+/g, ' ');
     if (!rule) continue;
     if (/^24\/7$/.test(rule)) { week.forEach((_, i) => { week[i] = [[0, 1440]]; }); used = true; continue; }
+    // "Mo-Su,PH 09:00-17:00": the weekdays part still counts, holidays are just not modelled
+    rule = rule.replace(/\s*,\s*(PH|SH)\b|\b(PH|SH)\s*,\s*/g, '');
     // unsupported parts (holidays, months, weeks, sun events, comments) -> skip this rule
     if (/PH|SH|[A-Z][a-z]{2}\s*\d|\bJan|\bFeb|\bMar\b|\bApr|\bMay|\bJun|\bJul|\bAug|\bSep|\bOct|\bNov|\bDec|week|sunrise|sunset|dawn|dusk|"|\[|\+$|\(/.test(rule)) continue;
     // "Mo-Fr 09:00-17:00, Sa 10:00-14:00" -> split into day groups

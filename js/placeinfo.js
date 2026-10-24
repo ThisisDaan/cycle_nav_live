@@ -15,21 +15,21 @@ const dist = (a, b) => {
 // -> tags object or null, cached per place (name + rounded coordinates).
 // Nominatim (OSM search) answers fast and returns the place's OSM tags as extratags; Overpass is often
 // overloaded. Looks for the same name within ~60 m and turns the result back into OSM-style tags.
-export async function lookupPlace(name, ll) {
-  const key = `${name.toLowerCase()}|${ll[0].toFixed(4)}|${ll[1].toFixed(4)}`;
+export async function lookupPlace(name, ll, category = null) {
+  const key = `${category || name.toLowerCase()}|${ll[0].toFixed(4)}|${ll[1].toFixed(4)}`;
   if (cache.has(key)) return cache.get(key);
-  const [lat, lon] = ll, dy = 0.0006, dx = dy / Math.cos(lat * Math.PI / 180);
+  const [lat, lon] = ll, dy = category ? 0.0003 : 0.0006, dx = dy / Math.cos(lat * Math.PI / 180);
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&extratags=1&addressdetails=1&limit=5&bounded=1`
-    + `&q=${encodeURIComponent(name)}&viewbox=${lon - dx},${lat + dy},${lon + dx},${lat - dy}`;
+    + `&q=${encodeURIComponent(category ? category.replace(/_/g, ' ') : name)}&viewbox=${lon - dx},${lat + dy},${lon + dx},${lat - dy}`;
   const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
   if (!r.ok) throw new Error('nominatim ' + r.status);
   const n = name.toLowerCase();
-  const hits = (await r.json()).filter(h => { const m = (h.name || '').toLowerCase(); return m && (m.includes(n) || n.includes(m)); });
+  const hits = (await r.json()).filter(h => { if (category) return h.type === category; const m = (h.name || '').toLowerCase(); return m && (m.includes(n) || n.includes(m)); });
   const best = hits.map(h => ({ h, d: dist(ll, [+h.lat, +h.lon]) })).sort((a, b) => a.d - b.d)[0]?.h;
   let tags = null;
   if (best) {
     const a = best.address || {};
-    tags = { ...best.extratags, name: best.name, [best.category]: best.type };
+    tags = { ...best.extratags, name: best.name || name, [best.category]: best.type };
     if (a.road) tags['addr:street'] = a.road;
     if (a.house_number) tags['addr:housenumber'] = a.house_number;
     if (a.postcode) tags['addr:postcode'] = a.postcode;
@@ -39,8 +39,8 @@ export async function lookupPlace(name, ll) {
   cache.set(key, tags);
   return tags;
 }
-export const cachedPlace = (name, ll) => {
-  const key = `${name.toLowerCase()}|${ll[0].toFixed(4)}|${ll[1].toFixed(4)}`;
+export const cachedPlace = (name, ll, category = null) => {
+  const key = `${category || name.toLowerCase()}|${ll[0].toFixed(4)}|${ll[1].toFixed(4)}`;
   return cache.has(key) ? { tags: cache.get(key) } : null;
 };
 
@@ -76,6 +76,15 @@ export function detailsHtml(tags) {
   if (!tags) return '';
   const row = (ic, inner) => `<div class="pp-row"><span class="pp-ic">${ic}</span><span>${inner}</span></div>`;
   const out = [];
+  if (tags.amenity === 'bicycle_parking' || tags.bicycle_parking) {
+    // what kind of bike parking: a guarded garage or a rack on the street makes a big difference
+    const kind = { building: 'Indoor bike garage', lockers: 'Bike lockers', shed: 'Bike shed', stands: 'Bike stands', wall_loops: 'Wheel racks', rack: 'Bike racks', two_tier: 'Two-tier racks', ground_slots: 'Wheel slots', bollard: 'Bollards', anchors: 'Ground anchors' }[tags.bicycle_parking];
+    const bits = [kind && t(kind), tags.supervised === 'yes' && t('Guarded'), tags.covered === 'yes' && t('Covered'),
+      tags.fee === 'yes' ? t('Paid') : tags.fee === 'no' && t('Free'), tags.capacity && t('{0} spaces', Number(tags.capacity).toLocaleString())].filter(Boolean);
+    const secure = tags.supervised === 'yes' || ['building', 'lockers'].includes(tags.bicycle_parking);
+    if (bits.length) out.push(row(secure ? '🔒' : '🅿️', esc(bits.join(' · '))));
+    if (tags.operator) out.push(row('🏢', esc(tags.operator)));
+  }
   if (tags.opening_hours) out.push(hoursHtml(tags.opening_hours));
   const street = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
   const city = tags['addr:city'] || tags['addr:postcode'];
