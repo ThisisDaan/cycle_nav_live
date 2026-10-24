@@ -1130,7 +1130,7 @@ function showWxPop() {
   if (a.cur?.speed != null) facts.push(`<span class="wx-arrow" style="transform:rotate(${Math.round(a.cur.dir + 180)}deg)">↑</span> ${t('Wind {0} Bft', a.wind?.bft ?? '–')} · ${Math.round(a.cur.speed * 3.6)} km/h`);
   pop.innerHTML = `<div class="wx-card" role="dialog">
     <div class="wx-head ${`wx-${a.kind}`}">${wxLine(a)}</div>
-    <h4>${t('Rain next 90 minutes')}${max >= 0.1 ? ` · ${max < 1 ? t('light') : max < 5 ? t('moderate') : t('heavy')}` : ''}</h4>
+    <h4>${t('Rain forecast, next 90 min')} · ${max < 0.1 ? t('dry') : max < 1 ? t('light') : max < 5 ? t('moderate') : t('heavy')}</h4>
     <div class="wx-graph">${cols}</div>
     <div class="wx-facts">${facts.map(f => `<span>${f}</span>`).join('')}</div>
     <button class="secondary-btn wx-close">${t('Close')}</button></div>`;
