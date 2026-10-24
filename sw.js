@@ -1,6 +1,6 @@
 // Network-first cache of the app shell so Cycle Nav still opens with a bad connection.
 
-const CACHE = 'cyclenav-v48';
+const CACHE = 'cyclenav-v49';
 const SHELL = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'icons/icon.svg', 'profiles/calm.brf',
   'js/app.js', 'js/native.js', 'js/geo.js', 'js/geocode.js', 'js/memory.js', 'js/nav.js', 'js/router.js', 'js/store.js', 'js/theme.js', 'js/mapstyle.js', 'js/i18n.js', 'js/offline.js', 'js/weather.js', 'js/brouter-native.js', 'js/sheet.js',
   'vendor/pbf.js', 'vendor/vector-tile.js', 'vendor/point-geometry.js',

@@ -47,7 +47,7 @@ input, select { font: inherit; color: inherit; }
 body.nav-3d { --tilt: 50deg; }
 body.nav-3d #mapWrap { perspective: 1500px; }
 body.nav-3d #map { overflow: visible; transform-style: preserve-3d; }
-body.nav-3d #map .leaflet-pane { transform-style: preserve-3d; }
+body.nav-3d #map .leaflet-pane, body.nav-3d .me-marker { transform-style: preserve-3d; }
 .me-tilt { position: absolute; inset: 0; }
 body.nav-3d .me-tilt { transform: rotate(var(--rot, 0deg)) rotateX(calc(-1 * var(--tilt))) rotate(calc(-1 * var(--rot, 0deg))); transition: transform .5s linear; }
 #skyFog { position: fixed; left: 0; right: 0; top: 0; height: 42%; pointer-events: none; display: none; z-index: 5;
@@ -391,7 +391,7 @@ body.navigating #planner, body.navigating #mapButtons, body.navigating #sheet { 
 
 /* ---- markers ---- */
 .me-marker { position: relative; }
-.me-arrow { width: 40px; height: 40px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.me-arrow { width: 52px; height: 52px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.3)); }
 .me-rot { transition: transform .25s linear; }
 .me-rot.no-heading { opacity: .85; }
 .me-beam.no-heading { opacity: 0; }

@@ -603,14 +603,14 @@ function meIconInner() {
     const b = store.activeBike();
     return cone + `<div class="bike-badge me-bike" style="--bike:${esc(b.color)}">${esc(b.icon)}</div>`;
   }
-  return '<svg class="me-arrow me-rot" viewBox="0 0 40 40"><path d="M20 4 L33 34 L20 27 L7 34 Z" fill="var(--accent)" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>';
+  return '<svg class="me-arrow me-rot" viewBox="0 0 40 40"><path d="M20 5 L32 33 L20 26.5 L8 33 Z" fill="var(--accent)" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/></svg>';
 }
 
 function drawMe(rebuild = false) {
   if (!me) return;
   if (rebuild && meMarker) { meMarker.remove(); meMarker = null; }
   if (!meMarker) {
-    const size = S().theme.marker === 'dot' ? 40 : S().theme.marker === 'bike' ? 38 : 40;
+    const size = S().theme.marker === 'dot' ? 40 : S().theme.marker === 'bike' ? 38 : 52;
     meMarker = L.marker(me.latlng, {
       icon: L.divIcon({ className: 'me-marker', html: meIconHtml(), iconSize: [size, size], iconAnchor: [size / 2, size / 2] }),
       interactive: false,
