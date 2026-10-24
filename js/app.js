@@ -710,6 +710,7 @@ function setupPlanner() {
     syncInputs();
     planRoute();
   };
+  $('#cancelRouteBtn').onclick = () => $('#clearBtn').click();
   $('#clearBtn').onclick = () => {
     if (to) pushUndo('Route cleared');
     from = ME; to = null;
