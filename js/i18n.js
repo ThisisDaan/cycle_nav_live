@@ -193,6 +193,8 @@ const NL = {
   "Couldn't route through that point: {0}": 'Geen route via dat punt mogelijk: {0}',
   "Couldn't find a route: {0}": 'Geen route gevonden: {0}',
   "{0}'s pace": 'Tempo van {0}',
+  'Change': 'Wijzig',
+  'Choose bike': 'Kies fiets',
   'Undo my changes': 'Mijn wijzigingen ongedaan maken',
   'Drag the green line to change the route': 'Sleep de groene lijn om de route te wijzigen',
   'Your usual way': 'Je vaste route',

@@ -234,7 +234,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 }
 .sheet-handle { display: block; width: 44px; height: 5px; border-radius: 5px; background: var(--muted); opacity: .45; }
 .sheet-handle-btn { border: 0; background: none; width: 100%; padding: 4px 0 12px; display: flex; justify-content: center; }
-.sheet.collapsed .route-status, .sheet.collapsed .route-card:not(.selected) { display: none; }
+.sheet.collapsed .route-status, .sheet.collapsed .sheet-bike, .sheet.collapsed .route-card:not(.selected) { display: none; }
 .sheet.collapsed .route-cards { padding-bottom: 8px; }
 .route-hint { white-space: nowrap; }
 .sheet-actions { display: flex; gap: 8px; flex: none; padding-top: 12px; border-top: 1px solid var(--border); }
@@ -261,6 +261,20 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 #viaRows .via-row:first-child { border-top: 1px solid var(--border); }
 #viaRows { max-height: 40vh; overflow-y: auto; }
 .route-status { color: var(--muted); font-size: 13px; padding: 0 2px 8px; }
+/* the bike you're planning for: lives in the route sheet, since it only matters there */
+.sheet-bike {
+  display: flex; align-items: center; gap: 10px; flex: none;
+  width: 100%; margin: 0 0 8px; padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface-2); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+}
+.sheet-bike .bike-badge { width: 32px; height: 32px; }
+.sheet-bike .chip-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.sheet-bike .chip-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet-bike small { color: var(--muted); font-size: 12px; }
+.sheet-bike-change { display: flex; align-items: center; gap: 2px; color: var(--accent); font-weight: 700; font-size: 14px; flex: none; }
+.bike-menu { transform-origin: bottom left; animation: menu-up .2s ease-out; max-height: 50vh; overflow-y: auto; }
+@keyframes menu-up { from { opacity: 0; transform: translateY(8px) scale(.96); } }
 .route-status:empty { display: none; }
 .route-cards { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding-bottom: 10px; }
 .route-card {
@@ -662,9 +676,9 @@ body.navigating #dlCard { bottom: auto; top: calc(130px + var(--safe-top)); }
 @keyframes sheet-out { to { transform: translateY(40px); opacity: 0; } }
 .sheet, .nav-bar { touch-action: pan-y; }
 .sheeting, .settling { will-change: height; }
-.sheeting .route-status, .sheeting .route-card:not(.selected), .settling .route-status, .settling .route-card:not(.selected),
+.sheeting .route-status, .sheeting .sheet-bike, .settling .sheet-bike, .sheeting .route-card:not(.selected), .settling .route-status, .settling .route-card:not(.selected),
 .sheeting .nav-details, .settling .nav-details { opacity: var(--p, 1); }
-.settling .route-status, .settling .route-card:not(.selected), .settling .nav-details { transition: opacity .3s cubic-bezier(.2,.8,.2,1); }
+.settling .route-status, .settling .sheet-bike, .settling .route-card:not(.selected), .settling .nav-details { transition: opacity .3s cubic-bezier(.2,.8,.2,1); }
 .nav-handle { display: block; width: 44px; height: 5px; border-radius: 5px; background: var(--muted); opacity: .45; margin: 2px auto 0; flex: none; }
 .nav-chevron { transition: transform .3s cubic-bezier(.2,.8,.2,1); }
 #rememberBtn { display: grid; place-items: center; color: var(--accent); }
@@ -706,6 +720,7 @@ body.navigating #undoBtn, body.navigating #undoBar, body.picking #undoBtn { disp
   #sheet .sheet-handle-btn { display: none; }
   #sheet.collapsed .route-card:not(.selected) { display: grid; }
   #sheet.collapsed .route-status { display: block; }
+  #sheet.collapsed .sheet-bike { display: flex; }
   #sheet .route-cards { flex: 1; min-height: 0; }
   .route-card { padding: 7px 10px; }
   .route-card .rc-time { font-size: 18px; }

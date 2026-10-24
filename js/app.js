@@ -1067,11 +1067,9 @@ function selectRoute(i, fit = false) {
 }
 
 function renderRouteCards() {
-  const bike = store.activeBike();
-  const pace = `${t("{0}'s pace", esc(bike.name))}: <b>${bikeSpeed(bike, rideList).kmh.toFixed(1)} km/h</b>`;
   $('#routeStatus').innerHTML = vias.length
-    ? `${pace} · <button class="link-btn" id="resetVias">Undo my changes</button>`
-    : `${pace} · <span class="route-hint">Drag the green line to change the route</span>`;
+    ? '<button class="link-btn" id="resetVias">Undo my changes</button>'
+    : '<span class="route-hint">Drag the green line to change the route</span>';
   $('#resetVias') && ($('#resetVias').onclick = () => { pushUndo('Route reset'); vias = gpxRoute ? gpxRoute.vias.slice() : []; planRoute(); });
   $('#rememberBtn').hidden = options[selected]?.kind !== 'custom';
   $('#routeCards').innerHTML = options.map((o, i) => {
@@ -1737,7 +1735,8 @@ function wxRender() {
   const a = wxAdvice;
   const o = !$('#sheet').hidden && options[selected];
   const chip = $('#wxChip');
-  chip.hidden = !(a && !o && !nav);
+  // on the map only when rain is on its way; a dry forecast is just clutter
+  chip.hidden = !(a && a.kind !== 'go' && !o && !nav);
   if (!chip.hidden) { chip.innerHTML = wxLine(a); chip.className = `wx-chip wx-${a.kind}`; }
   const line = document.querySelector('.route-card.selected .rc-advice');
   if (line) {
@@ -2680,15 +2679,21 @@ function renderBikeChip() {
   const b = store.activeBike();
   const sp = bikeSpeed(b, rideList);
   $('#bikeChip').innerHTML = `<span class="bike-badge" style="--bike:${esc(b.color)}">${iconOrEmoji(b.icon, 20)}</span>
-    <span class="chip-text"><span class="chip-name">${esc(b.name)}</span><small>${sp.kmh.toFixed(1)} km/h · ${t(ROUTE_STYLES[b.style]?.label || 'Calm')}</small></span>`;
+    <span class="chip-text"><span class="chip-name">${esc(b.name)}</span><small>${sp.kmh.toFixed(1)} km/h · ${t(ROUTE_STYLES[b.style]?.label || 'Calm')}</small></span>
+    <span class="sheet-bike-change">${t('Change')}${icon('expand_more', 18)}</span>`;
   if (S().theme.marker === 'bike') drawMe(true);
 }
 
 function toggleBikeMenu() {
   const menu = $('#bikeMenu');
   if (!menu.hidden) { menu.hidden = true; return; }
+  // the chip sits in the route sheet, so the menu opens upwards from it
   const chip = $('#bikeChip').getBoundingClientRect();
-  menu.style.top = `${chip.bottom + 8}px`;
+  menu.style.top = 'auto';
+  menu.style.bottom = `${innerHeight - chip.top + 8}px`;
+  menu.style.left = `${chip.left}px`;
+  menu.style.right = 'auto';
+  menu.classList.add('bike-menu');
   menu.innerHTML = S().bikes.map(b => `
     <button data-id="${b.id}" class="${b.id === S().activeBikeId ? 'current' : ''}">
       <span class="bike-badge" style="--bike:${esc(b.color)}">${iconOrEmoji(b.icon, 20)}</span>
