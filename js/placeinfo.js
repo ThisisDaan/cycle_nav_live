@@ -18,13 +18,13 @@ const dist = (a, b) => {
 export async function lookupPlace(name, ll, category = null) {
   const key = `${category || name.toLowerCase()}|${ll[0].toFixed(4)}|${ll[1].toFixed(4)}`;
   if (cache.has(key)) return cache.get(key);
-  const [lat, lon] = ll, dy = category ? 0.0003 : 0.0006, dx = dy / Math.cos(lat * Math.PI / 180);
+  const [lat, lon] = ll, dy = category === 'station' ? 0.002 : category ? 0.0003 : 0.0006, dx = dy / Math.cos(lat * Math.PI / 180);
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&extratags=1&addressdetails=1&limit=5&bounded=1`
-    + `&q=${encodeURIComponent(category ? category.replace(/_/g, ' ') : name)}&viewbox=${lon - dx},${lat + dy},${lon + dx},${lat - dy}`;
+    + `&q=${encodeURIComponent(category && category !== 'station' ? category.replace(/_/g, ' ') : name)}&viewbox=${lon - dx},${lat + dy},${lon + dx},${lat - dy}`;
   const r = await fetch(url, { signal: AbortSignal.timeout(9000) });
   if (!r.ok) throw new Error('nominatim ' + r.status);
   const n = name.toLowerCase();
-  const hits = (await r.json()).filter(h => { if (category) return h.type === category; const m = (h.name || '').toLowerCase(); return m && (m.includes(n) || n.includes(m)); });
+  const hits = (await r.json()).filter(h => { if (category === 'station') return h.category === 'railway' && ['station', 'halt'].includes(h.type); if (category) return h.type === category; const m = (h.name || '').toLowerCase(); return m && (m.includes(n) || n.includes(m)); });
   const best = hits.map(h => ({ h, d: dist(ll, [+h.lat, +h.lon]) })).sort((a, b) => a.d - b.d)[0]?.h;
   let tags = null;
   if (best) {
@@ -35,6 +35,15 @@ export async function lookupPlace(name, ll, category = null) {
     if (a.postcode) tags['addr:postcode'] = a.postcode;
     const city = a.city || a.town || a.village;
     if (city) tags['addr:city'] = city;
+    if (a.country_code) tags['addr:country'] = a.country_code;
+    // stations rarely carry a website in OSM, but their Wikidata item usually names the official one
+    if (isStation(tags) && !tags.website && !tags['contact:website'] && tags.wikidata) {
+      try {
+        const w = await (await fetch(`https://www.wikidata.org/w/api.php?action=wbgetclaims&entity=${encodeURIComponent(tags.wikidata)}&property=P856&format=json&origin=*`, { signal: AbortSignal.timeout(6000) })).json();
+        const url = w.claims?.P856?.[0]?.mainsnak?.datavalue?.value;
+        if (url) tags.website = url;
+      } catch {}
+    }
   }
   cache.set(key, tags);
   return tags;
@@ -64,6 +73,20 @@ function hoursHtml(raw) {
   const today = (new Date().getDay() + 6) % 7;
   const rows = weekStrings(week, t('Closed')).map((s, i) => `<div class="${i === today ? 'pp-today' : ''}"><span>${esc(t(DAY_NAMES[i].slice(0, 3)))}</span><span>${esc(s === '24h' ? t('Open 24/7') : s)}</span></div>`).join('');
   return `<details class="pp-row pp-hours"><summary data-show="${esc(t('All hours'))}" data-hide="${esc(t('Hide'))}"><span class="pp-ic">🕒</span><span>${esc(status)}</span></summary><div class="pp-week">${rows}</div></details>`;
+}
+
+export const isStation = tags => ['station', 'halt'].includes(tags?.railway) || tags?.public_transport === 'station' && tags?.train === 'yes';
+
+// Where to plan a train trip from this station: the national rail planner where we know its link
+// format, otherwise Google Maps public transport directions (works everywhere).
+export function trainPlanner(name, ll, country) {
+  const n = encodeURIComponent(name);
+  return {
+    nl: `https://www.ns.nl/reisplanner/#/?vertrek=${n}`,
+    de: `https://www.bahn.de/buchung/fahrplan/suche#sts=true&so=${n}`,
+    be: 'https://www.belgiantrain.be/nl/travel-info/journey-planner',
+    lv: 'https://www.pv.lv/',
+  }[country] || `https://www.google.com/maps/dir/?api=1&destination=${ll[0]},${ll[1]}&travelmode=transit`;
 }
 
 // Call / website targets for the place sheet's buttons.

@@ -14,7 +14,7 @@ import { bottomSheet } from './sheet.js';
 import { refreshOfflineSegments, routingMode } from './router.js';
 import { adviseHere, adviseRide } from './weather.js';
 import { createRainFx } from './rainfx.js';
-import { cachedPlace, detailsHtml, lookupPlace, placeLinks } from './placeinfo.js';
+import { cachedPlace, detailsHtml, isStation, lookupPlace, placeLinks, trainPlanner } from './placeinfo.js';
 import { LANGUAGES, language, startTranslating, t } from './i18n.js';
 import { bearing, dist, fmtClock, fmtDist, fmtDuration, projectOnSegment, resample, simplify } from './geo.js';
 
@@ -448,14 +448,14 @@ function tapMap(e) {
   if (e.originalEvent?.target?.closest?.('.leaflet-marker-icon, .leaflet-interactive, .leaflet-popup')) return;
   const hit = poiAt(e);
   // named places are looked up by name; unnamed bike parking by type (to tell guarded garages from racks)
-  if (hit) openPlaceSheet(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', hit.p.name ? true : hit.p.class === 'bicycle_parking' && 'bicycle_parking');
+  if (hit) openPlaceSheet(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', hit.p.class === 'railway' ? 'station' : hit.p.name ? true : hit.p.class === 'bicycle_parking' && 'bicycle_parking', hit.p.class === 'railway');
   else closePlaceSheet();
 }
 
 // Tapped place as a bottom card, like Google Maps: details fill in once looked up, with
 // Save / Call / Website / Directions buttons (Via too while a route is planned).
 var placeSel = null;
-function openPlaceSheet(latlng, name, sub, lookup) {
+function openPlaceSheet(latlng, name, sub, lookup, station = false) {
   if (nav) return;
   if (fol.mode && !fol.paused) pauseFollow();
   map.closePopup();
@@ -472,6 +472,7 @@ function openPlaceSheet(latlng, name, sub, lookup) {
       + (options.length ? `<button class="secondary-btn" data-a="via">${esc(t('Via'))}</button>` : '')
       + (l.tel ? `<a class="secondary-btn place-link" href="${esc(l.tel)}">📞 ${esc(t('Call'))}</a>` : '')
       + (l.site ? `<a class="secondary-btn place-link" href="${esc(l.site)}" target="_blank" rel="noopener noreferrer">🌐 ${esc(t('Website'))}</a>` : '')
+      + (station || isStation(tags) ? `<a class="secondary-btn place-link" href="${esc(trainPlanner(name, latlng, tags?.['addr:country']))}" target="_blank" rel="noopener noreferrer">🚆 ${esc(t('Trains'))}</a>` : '')
       + `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
     $('#placeActions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => go(b.dataset.a));
   };
