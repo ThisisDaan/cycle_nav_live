@@ -1433,6 +1433,7 @@ function setupButtons() {
   $('#overviewBtn').onclick = showOverview;
   setupStopSearch();
   $('#settingsBtn').onclick = () => openSettings('bikes');
+  $('#navSettingsBtn').onclick = () => openSettings('more');
   setupDrawer();
   $('#closeSettings').onclick = closeSettings;
   $('#bikeChip').onclick = e => { e.stopPropagation(); toggleBikeMenu(); };
@@ -2390,10 +2391,6 @@ function lookTab() {
     </div>
     <div class="section"><h3>Your position on the map</h3>
       <div class="choices">${Object.entries(MARKERS).map(([k, l]) => `<button class="choice ${t.marker === k ? 'selected' : ''}" data-marker="${k}">${l}</button>`).join('')}</div>
-    </div>
-    <div class="section"><h3>App icon</h3>
-      <div class="choices">${Object.entries(APP_ICONS).map(([k, l]) => `<button class="choice icon-choice ${t.appIcon === k ? 'selected' : ''}" data-icon-kind="${k}" title="${l}">${iconSvg(k, t.accent, 52)}</button>`).join('')}</div>
-      <p class="hint">Used for the browser tab and when you add Cycle Nav to your home screen (re-add it to pick up a new icon).</p>
     </div>`;
 }
 
