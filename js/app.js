@@ -469,14 +469,14 @@ function openPlaceSheet(latlng, name, sub, lookup, station = false) {
   const render = tags => {
     const l = placeLinks(tags);
     const saved = (S().pins || []).some(p => dist(p.latlng, latlng) < 30);
-    // one row on every card: links turn icon-only when there are several, so Directions never wraps
-    const links = [l.tel && [l.tel, icon('phone'), t('Call'), ''], l.site && [l.site, icon('language'), t('Website'), ' target="_blank" rel="noopener noreferrer"'],
-      (station || isStation(tags)) && [trainPlanner(name, latlng, tags?.['addr:country']), icon('train'), t('Trains'), ' target="_blank" rel="noopener noreferrer"']].filter(Boolean);
-    const compact = links.length + (options.length ? 1 : 0) >= 2;
-    $('#placeActions').innerHTML = `<button class="secondary-btn place-save${saved ? ' saved' : ''}" data-a="pin" title="${esc(t('Save as pin'))}" aria-label="${esc(t('Save as pin'))}">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG}</button>`
-      + (options.length ? `<button class="secondary-btn" data-a="via">${esc(t('Via'))}</button>` : '')
-      + links.map(([href, ic, label, extra]) => `<a class="secondary-btn place-link" href="${esc(href)}"${extra} title="${esc(label)}" aria-label="${esc(label)}">${ic}${compact ? '' : ` ${esc(label)}`}</a>`).join('')
-      + `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
+    // the same layout on every card: a row of labelled buttons (scrolls sideways if long), Directions below
+    const ext = ' target="_blank" rel="noopener noreferrer"';
+    const links = [l.tel && [l.tel, icon('phone'), t('Call'), ''], l.site && [l.site, icon('language'), t('Website'), ext],
+      (station || isStation(tags)) && [trainPlanner(name, latlng, tags?.['addr:country']), icon('train'), t('Train times'), ext]].filter(Boolean);
+    $('#placeActions').innerHTML = `<div class="place-pills"><button class="place-pill${saved ? ' saved' : ''}" data-a="pin">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG} ${esc(t(saved ? 'Saved' : 'Save'))}</button>`
+      + (options.length ? `<button class="place-pill" data-a="via">${icon('add')} ${esc(t('Go via here'))}</button>` : '')
+      + links.map(([href, ic, label, extra]) => `<a class="place-pill" href="${esc(href)}"${extra}>${ic} ${esc(label)}</a>`).join('')
+      + `</div><button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
     $('#placeActions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => go(b.dataset.a));
   };
   const cat = lookup === true ? null : lookup || null, cached = lookup ? cachedPlace(name, latlng, cat) : null;

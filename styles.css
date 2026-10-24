@@ -911,12 +911,14 @@ body.drawer-open #recenterBtn { display: none; }
 #placeSheet { z-index: 1010; gap: 8px; padding-top: 14px; }
 .place-head { display: flex; align-items: flex-start; gap: 8px; }
 .place-head > div { flex: 1; min-width: 0; }
-.place-save { display: grid; place-items: center; color: var(--muted); }
-.place-save.saved { color: var(--accent); }
-.place-save .bm-ic { width: 22px; height: 22px; }
-.place-link { display: inline-flex; align-items: center; justify-content: center; gap: 4px; text-decoration: none; }
-#placeActions .primary-btn { flex: 1; min-width: 0; }
-#placeActions .place-link { color: var(--text); font-weight: 600; }
+#placeActions { flex-direction: column; align-items: stretch; }
+.place-pills { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px; padding: 0 2px 2px; }
+.place-pills::-webkit-scrollbar { display: none; }
+.place-pill { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; white-space: nowrap; transition: background .15s, color .15s; }
+.place-pill:active { background: var(--border); }
+.place-pill .ic, .place-pill .bm-ic { width: 18px; height: 18px; color: var(--accent); }
+.place-pill.saved { color: var(--accent); border-color: var(--accent); }
+#placeActions .primary-btn { width: 100%; }
 
 /* inline Material icons */
 .ic { flex: none; vertical-align: -3px; }

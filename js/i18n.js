@@ -410,6 +410,7 @@ const NL = {
   'Leave now – rain reaches {0} around {1}, about {2} after you pass': 'Ga nu – rond {1} regent het bij {0}, zo’n {2} nadat je er langs bent',
   'Probably dry – rain clears at {0} only {1} before you get there, keep a jacket handy': 'Waarschijnlijk droog – bij {0} stopt de regen pas {1} voordat je er bent, houd een jas bij de hand',
   'the start': 'het begin',
+  'Train times': 'Treintijden',
   'Trains': 'Treinen',
   'Indoor bike garage': 'Fietsenstalling (binnen)',
   'Bike lockers': 'Fietskluizen',
