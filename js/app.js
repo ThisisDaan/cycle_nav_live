@@ -14,6 +14,7 @@ import { bottomSheet } from './sheet.js';
 import { refreshOfflineSegments, routingMode } from './router.js';
 import { adviseHere, adviseRide } from './weather.js';
 import { createRainFx } from './rainfx.js';
+import { cachedPlace, detailsHtml, lookupPlace } from './placeinfo.js';
 import { LANGUAGES, language, startTranslating, t } from './i18n.js';
 import { bearing, dist, fmtClock, fmtDist, fmtDuration, projectOnSegment, resample, simplify } from './geo.js';
 
@@ -412,27 +413,41 @@ function poiAt(e) {
   return best;
 }
 
-function placePopupHtml(name, sub, only) {
-  return `<div class="map-popup"><b class="selectable">${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}${only === 'via' ? '' : '<button data-a="from">Directions from here</button>'}${
+function placePopupHtml(name, sub, only, extra = '') {
+  return `<div class="map-popup"><b class="selectable">${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}${extra}${only === 'via' ? '' : '<button data-a="from">Directions from here</button>'}${
     options.length ? '<button data-a="via">Go via here</button>' : ''}${only === 'via' ? '' : `<button class="go" data-a="to">Directions to here</button><button data-a="pin">${BOOKMARK_SVG} Save as pin</button>`}</div>`;
 }
-function openPlacePopup(latlng, name, sub, only) {
+function openPlacePopup(latlng, name, sub, only, lookup) {
   if (nav) return;
   if (fol.mode && !fol.paused) pauseFollow();
   const place = { name, detail: sub || '', latlng };
-  const popup = L.popup({ closeButton: false, offset: [0, -4] }).setLatLng(latlng).setContent(placePopupHtml(name, sub, only)).openOn(map);
-  popup.getElement()?.querySelectorAll('button').forEach(b => b.onclick = () => {
+  const cached = lookup ? cachedPlace(name, latlng) : null;
+  const popup = L.popup({ closeButton: false, offset: [0, -4], maxWidth: 260 }).setLatLng(latlng)
+    .setContent(placePopupHtml(name, sub, only, cached ? detailsHtml(cached.tags) : lookup ? `<small class="pp-loading">${esc(t('Loading details…'))}</small>` : '')).openOn(map);
+  const wire = () => popup.getElement()?.querySelectorAll('button').forEach(b => b.onclick = () => {
     map.closePopup();
     if (b.dataset.a === 'via') addVia(latlng);
     else if (b.dataset.a === 'pin') editPin(null, { name, latlng });
     else choosePlace(b.dataset.a, place);
+  });
+  wire();
+  if (lookup && !cached) lookupPlace(name, latlng).then(tags => {
+    if (!popup.isOpen()) return;
+    popup.setContent(placePopupHtml(name, sub, only, detailsHtml(tags)));
+    wire();
+    popup.update();
+  }).catch(() => {
+    if (!popup.isOpen()) return;
+    popup.setContent(placePopupHtml(name, sub, only));
+    wire();
+    popup.update();
   });
 }
 function tapMap(e) {
   if (nav || picking || Date.now() - lastCtx < 700) return;
   if (e.originalEvent?.target?.closest?.('.leaflet-marker-icon, .leaflet-interactive, .leaflet-popup')) return;
   const hit = poiAt(e);
-  if (hit) openPlacePopup(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '');
+  if (hit) openPlacePopup(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', undefined, !!hit.p.name);
 }
 
 // The CSS rotation animates over ROT_MS; read the angle it is *actually* showing (computed style),
