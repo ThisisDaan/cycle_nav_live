@@ -591,13 +591,32 @@ function watchGps() {
   }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
 }
 
+// accelerometer: when did the phone last move? (a phone on a desk or in a still hand barely registers)
+let motionAt = 0, shakeAt = 0, lastG = null;
+function onMotion(e) {
+  const g = e.accelerationIncludingGravity;
+  if (!g || g.x == null) return;
+  const now = Date.now();
+  if (lastG && Math.hypot(g.x - lastG.x, g.y - lastG.y, g.z - lastG.z) > 0.6) shakeAt = now;
+  lastG = { x: g.x, y: g.y, z: g.z };
+  motionAt = now;
+}
+function phoneStill() {
+  const now = Date.now();
+  return now - motionAt < 2000 && now - shakeAt > 4000;
+}
+
 function handleFix(fix) {
   const first = !me;
-  // Standing still, GPS wanders a few metres every second: keep the arrow put until we're clearly
-  // moving (over ~4 km/h) or the new fix lands outside the GPS error circle.
+  // Standing still, GPS wanders (indoors by tens of metres, with made-up speeds too): keep the arrow
+  // put until we're clearly moving or the fix lands well outside the error circle. When the motion
+  // sensor says the phone isn't moving at all, hold on much harder. A clearly sharper fix still wins.
   if (!first) {
-    const d = dist(me.latlng, fix.latlng), r = Math.max(6, Math.min(25, (fix.accuracy || 10) * 0.8));
-    if ((fix.speed == null || fix.speed < 1.2) && d < r) fix = { ...fix, latlng: me.latlng, heading: me.heading };
+    const d = dist(me.latlng, fix.latlng), acc = fix.accuracy || 20, still = phoneStill();
+    const moving = !still && fix.speed != null && fix.speed >= 1.5 && acc <= 25;
+    const r = still ? Math.max(30, Math.min(80, acc * 1.5)) : Math.max(8, Math.min(50, acc));
+    const sharper = acc < (me.accuracy || 99) * 0.5;
+    if (!moving && !sharper && d < r) fix = { ...fix, latlng: me.latlng, heading: me.heading, accuracy: me.accuracy };
   }
   if (first) setTimeout(() => { if (me) wxUpdate(); }, 0);
   if (fix.heading == null) {
@@ -705,6 +724,7 @@ function startCompass() {
     compass = compass == null ? h : (compass + angleDelta(compass, h) * 0.3 + 360) % 360;
     scheduleHeading();
   };
+  addEventListener('devicemotion', onMotion);
   if ('ondeviceorientationabsolute' in window) addEventListener('deviceorientationabsolute', onOrientation);
   else addEventListener('deviceorientation', onOrientation);
   // iPhone Safari only gives the compass after asking, from a tap
