@@ -113,10 +113,7 @@ export function detailsHtml(tags) {
   const city = tags['addr:city'] || tags['addr:postcode'];
   const addr = [street, city].filter(Boolean).join(', ');
   if (addr) out.push(row('📍', `<span class="selectable">${esc(addr)}</span>`));
-  const phone = tags.phone || tags['contact:phone'];
-  if (phone) { const p = phone.split(';')[0].trim(); out.push(row('📞', `<a href="tel:${esc(p.replace(/[^+\d]/g, ''))}">${esc(p)}</a>`)); }
-  const site = website(tags.website || tags['contact:website'] || '');
-  if (site) out.push(row('🌐', `<a href="${esc(site.href)}" target="_blank" rel="noopener noreferrer">${esc(site.label)}</a>`));
+  // phone and website are buttons on the card, not rows
   const cu = (tags.cuisine || '').split(';').filter(Boolean).map(c => t(CUISINE[c.trim()] || pretty(c)));
   const dv = tags['diet:vegan'];
   if (dv === 'only') cu.push(t('Vegan')); else if (dv === 'yes') cu.push(t('Vegan options'));

@@ -468,11 +468,13 @@ function openPlaceSheet(latlng, name, sub, lookup, station = false) {
   const render = tags => {
     const l = placeLinks(tags);
     const saved = (S().pins || []).some(p => dist(p.latlng, latlng) < 30);
+    // one row on every card: links turn icon-only when there are several, so Directions never wraps
+    const links = [l.tel && [l.tel, '📞', t('Call'), ''], l.site && [l.site, '🌐', t('Website'), ' target="_blank" rel="noopener noreferrer"'],
+      (station || isStation(tags)) && [trainPlanner(name, latlng, tags?.['addr:country']), '🚆', t('Trains'), ' target="_blank" rel="noopener noreferrer"']].filter(Boolean);
+    const compact = links.length + (options.length ? 1 : 0) >= 2;
     $('#placeActions').innerHTML = `<button class="secondary-btn place-save${saved ? ' saved' : ''}" data-a="pin" title="${esc(t('Save as pin'))}" aria-label="${esc(t('Save as pin'))}">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG}</button>`
       + (options.length ? `<button class="secondary-btn" data-a="via">${esc(t('Via'))}</button>` : '')
-      + (l.tel ? `<a class="secondary-btn place-link" href="${esc(l.tel)}">📞 ${esc(t('Call'))}</a>` : '')
-      + (l.site ? `<a class="secondary-btn place-link" href="${esc(l.site)}" target="_blank" rel="noopener noreferrer">🌐 ${esc(t('Website'))}</a>` : '')
-      + (station || isStation(tags) ? `<a class="secondary-btn place-link" href="${esc(trainPlanner(name, latlng, tags?.['addr:country']))}" target="_blank" rel="noopener noreferrer">🚆 ${esc(t('Trains'))}</a>` : '')
+      + links.map(([href, ic, label, extra]) => `<a class="secondary-btn place-link" href="${esc(href)}"${extra} title="${esc(label)}" aria-label="${esc(label)}">${ic}${compact ? '' : ` ${esc(label)}`}</a>`).join('')
       + `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
     $('#placeActions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => go(b.dataset.a));
   };
