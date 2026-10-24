@@ -1496,8 +1496,6 @@ function setupTwist() {
   const ang = ts => Math.atan2(ts[1].clientY - ts[0].clientY, ts[1].clientX - ts[0].clientX) * 180 / Math.PI;
   addEventListener('touchstart', e => {
     if (e.touches.length !== 2 || locked || ![...e.touches].every(t => t.target.closest?.('#map'))) return;
-    clearTimeout(rotFrameTimer);
-    if (!nav) setRotFrame(true);
     g = { last: ang(e.touches), twist: 0, on: false, base: nav ? (nav.manual ?? mapRotation) : userRot };
   }, true);
   addEventListener('touchmove', e => {
@@ -1508,6 +1506,10 @@ function setupTwist() {
     if (!g.on) {
       if (Math.abs(g.twist) < 12) return;
       g.on = true;
+      // Only switch to the rotatable frame once it's really a twist: swapping it in on every
+      // two-finger touch resized the map mid-pinch and made it jump sideways.
+      clearTimeout(rotFrameTimer);
+      if (!nav) setRotFrame(true);
       document.body.classList.add('twisting');
     }
     const deg = g.base - g.twist;
@@ -1523,7 +1525,7 @@ function setupTwist() {
     const was = g;
     g = null;
     document.body.classList.remove('twisting');
-    if (nav) return;
+    if (nav || (!was.on && !userRot)) return; // a plain pinch: nothing to undo
     if (Math.abs(angleDelta(0, userRot)) < (was.on ? 6 : 1)) resetNorth(); // snap to north when close
     else rotateMap();
   };
