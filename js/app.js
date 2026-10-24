@@ -14,7 +14,7 @@ import { bottomSheet } from './sheet.js';
 import { refreshOfflineSegments, routingMode } from './router.js';
 import { adviseHere, adviseRide } from './weather.js';
 import { createRainFx } from './rainfx.js';
-import { cachedPlace, detailsHtml, lookupPlace } from './placeinfo.js';
+import { cachedPlace, detailsHtml, lookupPlace, placeLinks } from './placeinfo.js';
 import { LANGUAGES, language, startTranslating, t } from './i18n.js';
 import { bearing, dist, fmtClock, fmtDist, fmtDuration, projectOnSegment, resample, simplify } from './geo.js';
 
@@ -447,7 +447,46 @@ function tapMap(e) {
   if (nav || picking || Date.now() - lastCtx < 700) return;
   if (e.originalEvent?.target?.closest?.('.leaflet-marker-icon, .leaflet-interactive, .leaflet-popup')) return;
   const hit = poiAt(e);
-  if (hit) openPlacePopup(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', undefined, !!hit.p.name);
+  if (hit) openPlaceSheet(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '', !!hit.p.name);
+  else closePlaceSheet();
+}
+
+// Tapped place as a bottom card, like Google Maps: details fill in once looked up, with
+// Directions / Call / Website buttons and smaller from / via / save actions.
+var placeSel = null;
+function openPlaceSheet(latlng, name, sub, lookup) {
+  if (nav) return;
+  if (fol.mode && !fol.paused) pauseFollow();
+  map.closePopup();
+  const place = { name, detail: sub || '', latlng }, token = {};
+  placeSel?.marker.remove();
+  placeSel = { token, marker: L.circleMarker(latlng, { radius: 9, color: '#fff', weight: 3, fillColor: S().theme.accent, fillOpacity: 1, interactive: false }).addTo(map) };
+  $('#placeName').textContent = name;
+  $('#placeType').textContent = sub || '';
+  const go = act => { closePlaceSheet(); if (act === 'via') addVia(latlng); else if (act === 'pin') editPin(null, { name, latlng }); else choosePlace(act, place); };
+  const render = tags => {
+    const l = placeLinks(tags);
+    $('#placeActions').innerHTML = (l.tel ? `<a class="secondary-btn place-link" href="${esc(l.tel)}">📞 ${esc(t('Call'))}</a>` : '')
+      + (l.site ? `<a class="secondary-btn place-link" href="${esc(l.site)}" target="_blank" rel="noopener noreferrer">🌐 ${esc(t('Website'))}</a>` : '')
+      + `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
+    $('#placeActions [data-a]').onclick = () => go('to');
+  };
+  $('#placeMore').innerHTML = `<button data-a="from">${esc(t('Directions from here'))}</button>${options.length ? `<button data-a="via">${esc(t('Go via here'))}</button>` : ''}<button data-a="pin">${BOOKMARK_SVG} ${esc(t('Save as pin'))}</button>`;
+  $('#placeMore').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.a));
+  const cached = lookup ? cachedPlace(name, latlng) : null;
+  $('#placeBody').innerHTML = cached ? detailsHtml(cached.tags) : lookup ? `<small class="pp-loading">${esc(t('Loading details…'))}</small>` : '';
+  render(cached?.tags);
+  $('#placeSheet').hidden = false;
+  if (lookup && !cached) lookupPlace(name, latlng).then(tags => {
+    if (placeSel?.token !== token) return;
+    $('#placeBody').innerHTML = detailsHtml(tags); render(tags);
+  }).catch(() => { if (placeSel?.token === token) $('#placeBody').innerHTML = ''; });
+}
+function closePlaceSheet() {
+  if (!placeSel) return false;
+  placeSel.marker.remove(); placeSel = null;
+  $('#placeSheet').hidden = true;
+  return true;
 }
 
 // The CSS rotation animates over ROT_MS; read the angle it is *actually* showing (computed style),
@@ -1684,6 +1723,7 @@ function setupButtons() {
   };
   document.querySelectorAll('.lockBtn').forEach(b => b.onclick = lockScreen);
   $('#radarBtn').onclick = () => toggleRadar();
+  $('#placeClose').onclick = closePlaceSheet;
   setupFullscreen();
   setupLock();
   navCtl = bottomSheet({
@@ -3255,6 +3295,7 @@ function handleBack() {
   if (picking) { closePicker(); return true; }
   if (askState) { askClose(null); return true; }
   if (drawerOpen) { closeDrawer(); return true; }
+  if (closePlaceSheet()) return true;
   if (!$('#dialog').hidden) { closeDialog(); return true; }
   if (!$('#settings').hidden) { closeSettings(); return true; }
   if (!$('#bikeMenu').hidden) { $('#bikeMenu').hidden = true; return true; }

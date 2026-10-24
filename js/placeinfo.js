@@ -51,7 +51,7 @@ const CUISINE = {
 };
 const pretty = s => { s = s.trim().replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
-function website(v) {
+export function website(v) {
   v = String(v).trim();
   const url = /^https?:\/\//i.test(v) ? v : 'https://' + v;
   try { const u = new URL(url); if (!/^https?:$/.test(u.protocol)) return null; return { href: u.href, label: u.hostname.replace(/^www\./, '') }; } catch { return null; }
@@ -64,6 +64,12 @@ function hoursHtml(raw) {
   const today = (new Date().getDay() + 6) % 7;
   const rows = weekStrings(week, t('Closed')).map((s, i) => `<div class="${i === today ? 'pp-today' : ''}"><span>${esc(t(DAY_NAMES[i].slice(0, 3)))}</span><span>${esc(s === '24h' ? t('Open 24/7') : s)}</span></div>`).join('');
   return `<details class="pp-row pp-hours"><summary><span class="pp-ic">🕒</span><span>${esc(status)}</span></summary><div class="pp-week">${rows}</div></details>`;
+}
+
+// Call / website targets for the place sheet's buttons.
+export function placeLinks(tags) {
+  const phone = (tags?.phone || tags?.['contact:phone'] || '').split(';')[0].trim();
+  return { tel: phone ? 'tel:' + phone.replace(/[^+\d]/g, '') : null, site: website(tags?.website || tags?.['contact:website'] || '')?.href || null };
 }
 
 export function detailsHtml(tags) {

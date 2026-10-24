@@ -891,3 +891,13 @@ body.drawer-open #recenterBtn { display: none; }
 .pp-week { margin: 3px 0 0 22px; display: grid; gap: 1px; color: var(--muted); font-size: 12px; }
 .pp-week > div { display: flex; justify-content: space-between; gap: 10px; }
 .pp-week .pp-today { color: var(--text); font-weight: 700; }
+
+/* tapped place card */
+#placeSheet { z-index: 1010; gap: 8px; padding-top: 14px; }
+.place-head { display: flex; align-items: flex-start; gap: 8px; }
+.place-head > div { flex: 1; min-width: 0; }
+.place-more { display: flex; gap: 6px; flex-wrap: wrap; }
+.place-more button { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 6px 12px; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+.place-more .bm-ic { width: 15px; height: 15px; }
+.place-link { display: inline-flex; align-items: center; justify-content: center; gap: 4px; text-decoration: none; }
+#placeActions .primary-btn { flex: 1; }

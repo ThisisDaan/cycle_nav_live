@@ -202,6 +202,16 @@
   <div id="pickFrame" hidden>
     <i class="ph" data-c="nw"></i><i class="ph" data-c="ne"></i><i class="ph" data-c="sw"></i><i class="ph" data-c="se"></i>
   </div>
+  <!-- Tapped place: info card with actions -->
+  <section id="placeSheet" class="sheet place-sheet" hidden>
+    <div class="place-head">
+      <div><div id="placeName" class="pick-name"></div><div id="placeType" class="pick-info"></div></div>
+      <button id="placeClose" class="icon-btn" aria-label="Close">✕</button>
+    </div>
+    <div id="placeBody"></div>
+    <div id="placeMore" class="place-more"></div>
+    <div id="placeActions" class="sheet-actions"></div>
+  </section>
   <section id="pickSheet" class="sheet" hidden>
     <div id="pickName" class="pick-name"></div>
     <div id="pickInfo" class="pick-info"></div>
