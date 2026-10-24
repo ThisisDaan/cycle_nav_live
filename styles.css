@@ -852,12 +852,13 @@ body.drawer-open #recenterBtn { display: none; }
   .nav-handle { display: none; }
 }
 
-/* direction arrows along the chosen route: dark with a white rim, pulsing in a wave towards the destination */
+/* direction along the chosen route: dashes sliding towards the destination, plus still arrows */
+.route-flow.moving { animation: flow-move .9s linear infinite; }
+@keyframes flow-move { to { stroke-dashoffset: -18; } }
+@media (prefers-reduced-motion: reduce) { .route-flow.moving { animation: none; } }
 .flow-icon { pointer-events: none; }
 .flow-icon i { display: block; width: 22px; height: 22px; }
-.flow-icon svg { display: block; animation: flow-pulse 1.2s ease-in-out infinite; animation-delay: inherit; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
-@keyframes flow-pulse { 0%, 100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.1); } }
-@media (prefers-reduced-motion: reduce) { .flow-icon svg { animation: none; } }
+.flow-icon svg { display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
 
 /* rain radar */
 #radarBtn.active { background: var(--accent); color: var(--on-accent); }

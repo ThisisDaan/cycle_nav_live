@@ -1032,6 +1032,8 @@ function drawRoutes(onlySelected = false) {
   } else {
     L.polyline(r.coords, { color: accent, weight: 7, opacity: 1, interactive: false }).addTo(routeLayer);
   }
+  // dashes that slide along the line towards the destination (still while navigating, to save battery)
+  L.polyline(r.coords, { className: nav ? 'route-flow' : 'route-flow moving', color: '#1d2a33', weight: 3, opacity: .7, dashArray: '4 14', lineCap: 'round', interactive: false }).addTo(routeLayer);
   drawFlow();
   if (!nav) {
     // A wide invisible line that is easy to hit with a finger: press and drag it
@@ -1077,7 +1079,7 @@ async function toggleRadar(on = !radar) {
 // Small chevrons along the chosen route showing which way to ride (handy for GPX loops that cross themselves).
 // Spaced in screen pixels and limited to the visible area, so they are redrawn after every zoom or pan.
 var flowLayer = null;
-const FLOW_GAP = 70;
+const FLOW_GAP = 130;
 const FLOW_SVG = '<svg viewBox="0 0 22 22" width="22" height="22"><path d="M11 3 19 15 11 11.5 3 15z" fill="#1d2a33" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
 function drawFlow() {
   if (!flowLayer) {
@@ -1088,7 +1090,7 @@ function drawFlow() {
   const r = options[selected]?.route;
   if (!r || map.getZoom() < 13 || !map.hasLayer(routeLayer) || !routeLayer.getLayers().length) return;
   const view = map.getBounds().pad(0.3);
-  let carry = FLOW_GAP / 2, prev = map.latLngToLayerPoint(r.coords[0]), n = 0;
+  let carry = FLOW_GAP / 2, prev = map.latLngToLayerPoint(r.coords[0]);
   for (let i = 1; i < r.coords.length; i++) {
     const cur = map.latLngToLayerPoint(r.coords[i]), seg = prev.distanceTo(cur);
     while (carry <= seg) {
@@ -1096,8 +1098,7 @@ function drawFlow() {
       if (view.contains(ll)) {
         const deg = Math.round(Math.atan2(cur.x - prev.x, prev.y - cur.y) * 180 / Math.PI);
         L.marker(ll, { interactive: false, keyboard: false, zIndexOffset: -200,
-          // the pulse delay grows along the route, so a wave runs in the riding direction
-          icon: L.divIcon({ className: 'flow-icon', html: `<i style="transform:rotate(calc(${deg}deg - var(--irot, 0deg)));animation-delay:${(n++ % 8) * 0.15}s">${FLOW_SVG}</i>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
+          icon: L.divIcon({ className: 'flow-icon', html: `<i style="transform:rotate(calc(${deg}deg - var(--irot, 0deg)))">${FLOW_SVG}</i>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
         }).addTo(flowLayer);
       }
       carry += FLOW_GAP;
