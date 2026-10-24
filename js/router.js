@@ -126,8 +126,9 @@ async function fetchRouteOnline(points, bike, alternative, profile) {
     if (res.ok && body.trim().startsWith('{')) return parseRoute(JSON.parse(body));
     lastErr = new Error(body.trim().split('\n')[0] || `Routing failed (${res.status})`);
     lastErr.routing = true; // a real answer from the server, no point in falling back
-    // An expired custom profile is the one case worth retrying with a fresh upload.
-    if (!/profile/i.test(body)) break;
+    // An expired custom profile is the one case worth retrying with a fresh upload; the server
+    // reports it either by name or with an empty 500.
+    if (body.trim() && !/profile/i.test(body)) break;
   }
   throw lastErr;
 }
