@@ -189,12 +189,22 @@ export function computeAdvice(route, wx, now, durSec) {
   const e0 = ex[0].e;
 
   if (isDry(e0)) {
-    // Dry now: does rain catch up with us just after the ride?
-    let arrive = null;
-    for (let m = 0; m <= durSec / 60 + 25 && arrive == null; m += 5) {
-      if (pts.some(p => rainAt(p.rain, now + m * 60000) >= WET)) arrive = m;
+    // Dry now: does rain reach some spot on the route shortly after we have passed it?
+    const total = route.cum?.[route.cum.length - 1] ?? route.length ?? 0;
+    let tight = null;
+    for (const p of pts) {
+      const pass = now + p.frac * durMs;
+      for (let m = 5; m <= 20; m += 5) {
+        if (rainAt(p.rain, pass + m * 60000) < WET) continue;
+        if (!tight || m < tight.m) tight = { m, p, at: pass + m * 60000 };
+        break;
+      }
     }
-    if (arrive != null && arrive > 0) return { ...base, icon: '🏃', kind: 'rush', text: t("Leave now – rain arrives in {0}, you'll just stay dry", mins(Math.max(5, Math.round(arrive / 5) * 5))) };
+    if (tight) {
+      const f = tight.p.frac;
+      const where = f < 0.1 ? t('the start') : f > 0.9 ? t('your destination') : t('{0} km in', Math.round(f * total / 1000));
+      return { ...base, icon: '🏃', kind: 'rush', text: t('Leave now – rain reaches {0} around {1}, about {2} after you pass', where, clock(tight.at), mins(tight.m)) };
+    }
     return { ...base, icon: '🟢', kind: 'go', text: t('Go now, dry all the way') };
   }
   if (isLight(e0)) {
