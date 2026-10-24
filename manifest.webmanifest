@@ -1,0 +1,14 @@
+{
+  "name": "Cycle Nav",
+  "short_name": "Cycle Nav",
+  "description": "Calm bicycle navigation on OpenStreetMap",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1214",
+  "theme_color": "#2f9e6e",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

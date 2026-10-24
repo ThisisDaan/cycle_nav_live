@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#2f9e6e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Cycle Nav</title>
+  <link rel="icon" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="mapWrap"><div id="map"></div></div>
+  <div id="skyFog"></div>
+
+  <!-- Planning -->
+  <section id="planner" class="card">
+    <div class="planner-body">
+      <div class="planner-rows">
+        <div class="planner-row">
+          <span class="pin pin-start"></span>
+          <input id="fromInput" type="search" placeholder="My location" autocomplete="off" enterkeyhint="search">
+          <button id="swapBtn" class="icon-btn" title="Swap start and destination" aria-label="Swap">⇅</button>
+        </div>
+        <div id="viaRows"></div>
+        <div class="planner-row">
+          <span class="pin pin-end"></span>
+          <input id="toInput" type="search" placeholder="Where to?" autocomplete="off" enterkeyhint="search">
+          <button id="clearBtn" class="icon-btn" title="Clear route" aria-label="Clear">✕</button>
+        </div>
+      </div>
+    </div>
+    <ul id="suggestions" class="suggestions" hidden></ul>
+  </section>
+  <button id="undoBtn" class="round-btn" title="Undo" aria-label="Undo" hidden>
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62A7.96 7.96 0 0 1 12.5 10c3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 10.75 17.19 8 12.5 8z"/></svg>
+  </button>
+  <div id="undoBar" class="undo-bar" role="status" hidden><span id="undoMsg"></span><button id="undoAct">Undo</button></div>
+
+  <div id="mapButtons">
+    <button id="bikeChip" class="chip" aria-haspopup="true"></button>
+    <button id="wxChip" class="wx-chip" hidden></button>
+    <button id="settingsBtn" class="round-btn" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7zm7.43-2.53c.04-.32.07-.64.07-.97s-.03-.66-.07-.98l2.11-1.65a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1a7.3 7.3 0 0 0-1.69-.98l-.38-2.65A.49.49 0 0 0 14 2h-4a.49.49 0 0 0-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46a.49.49 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.65.07.97l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65a7.3 7.3 0 0 0 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64z"/></svg>
+    </button>
+    <button class="round-btn lockBtn" title="Lock screen" aria-label="Lock screen">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></svg>
+    </button>
+    <button id="compassBtn" class="round-btn" title="North up" aria-label="North up" hidden></button>
+    <button id="locateBtn" class="round-btn" title="Centre on me" aria-label="Centre on me">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm8.94 3A8.99 8.99 0 0 0 13 3.06V1h-2v2.06A8.99 8.99 0 0 0 3.06 11H1v2h2.06A8.99 8.99 0 0 0 11 20.94V23h2v-2.06A8.99 8.99 0 0 0 20.94 13H23v-2h-2.06zM12 19a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>
+    </button>
+    <button id="recordBtn" class="round-btn" title="Record a ride without navigating" aria-label="Record ride">
+      <span class="rec-dot"></span>
+    </button>
+  </div>
+  <div id="bikeMenu" class="popover" hidden></div>
+  <div id="wxPop" class="wx-overlay" hidden></div>
+
+  <!-- Route options -->
+  <section id="sheet" class="sheet" hidden>
+    <button id="sheetToggle" class="sheet-handle-btn" aria-label="Show or hide route options"><span class="sheet-handle"></span></button>
+    <div id="routeStatus" class="route-status"></div>
+    <div id="routeCards" class="route-cards"></div>
+    <div class="sheet-actions">
+      <button id="rememberBtn" class="secondary-btn" hidden title="Save this route" aria-label="Save this route"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg></button>
+      <button id="startBtn" class="primary-btn" disabled>Start</button>
+    </div>
+  </section>
+
+  <!-- Navigation -->
+  <section id="navBanner" class="nav-banner" hidden>
+    <div id="navArrow" class="nav-arrow"></div>
+    <div class="nav-text">
+      <div id="navDist" class="nav-dist"></div>
+      <div id="navInstr" class="nav-instr"></div>
+    </div>
+    <div id="navThen" class="nav-then" hidden></div>
+  </section>
+  <section id="navBar" class="nav-bar" hidden>
+    <span class="sheet-handle nav-handle"></span>
+    <div class="nav-row">
+      <button id="stopBtn" class="end-btn" aria-label="End ride"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg><span>End</span></button>
+      <button id="navToggle" class="nav-summary" aria-expanded="false" aria-label="Show ride details">
+        <span class="nav-stats">
+          <span><b id="navEta">–</b><small id="navEtaLabel">arrival</small></span>
+          <span><b id="navRemain">–</b><small id="navRemainLabel">to go</small></span>
+          <span><b id="navSpeed">–</b><small>km/h</small></span>
+        </span>
+        <span class="nav-chevron">▴</span>
+      </button>
+    </div>
+    <div id="navDetails" class="nav-details" hidden>
+      <div id="ndStopBox" class="nd-stop">
+        <input id="stopInput" type="search" placeholder="Add a stop (café, shop, address…)" autocomplete="off" enterkeyhint="search">
+        <ul id="stopResults" class="suggestions nd-results" hidden></ul>
+      </div>
+      <div id="ndStops"></div>
+      <div class="nav-actions">
+        <button id="overviewBtn" class="secondary-btn">Show whole route</button>
+        <button id="view3dBtn" class="secondary-btn"></button>
+      </div>
+      <div class="stat-row">
+        <div><b id="ndMoving">–</b><span>moving</span></div>
+        <div><b id="ndRidden">–</b><span>ridden</span></div>
+        <div><b id="ndAvg">–</b><span>km/h avg</span></div>
+      </div>
+      <h4 id="ndTurnsHead" class="nd-head">Coming up</h4>
+      <ol id="ndTurns" class="nd-turns"></ol>
+    </div>
+  </section>
+  <div id="navButtons" hidden>
+    <button id="orientBtn" class="round-btn" title="Map orientation" aria-label="Map orientation"></button>
+    <button id="voiceBtn" class="round-btn" title="Voice on/off" aria-label="Voice"></button>
+    <button class="round-btn lockBtn" title="Lock screen" aria-label="Lock screen">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></svg>
+    </button>
+  </div>
+  <button id="recenterBtn" class="pill-btn" hidden>Re-centre</button>
+
+  <!-- Settings -->
+  <div id="settings" class="overlay" hidden>
+    <div class="overlay-panel">
+      <header class="overlay-head">
+        <h1>Settings</h1>
+        <button id="closeSettings" class="icon-btn" aria-label="Close">✕</button>
+      </header>
+      <nav class="tabs" role="tablist">
+        <button data-tab="bikes" class="active">Bikes</button>
+        <button data-tab="look">Look</button>
+        <button data-tab="more">More</button>
+      </nav>
+      <div id="settingsBody" class="overlay-body"></div>
+    </div>
+  </div>
+
+  <!-- Saved drawer: pins, routes, rides -->
+  <div id="drawer">
+    <div id="drawerScrim"></div>
+    <aside id="drawerPanel" aria-label="Saved">
+      <div class="drawer-body">
+        <header class="drawer-head">
+          <h1>Saved</h1>
+          <button id="drawerClose" class="icon-btn" aria-label="Close">✕</button>
+        </header>
+        <div id="drawerSearchBox" class="drawer-search"><input id="drawerSearch" type="search" placeholder="Search saved" autocomplete="off" enterkeyhint="search"></div>
+        <div id="drawerList"></div>
+        <div id="drawerFoot" class="drawer-foot"></div>
+      </div>
+      <div id="drawerTabs" class="dtabs" role="tablist">
+        <button class="dtab" data-dt="pins" role="tab" style="--tc:#f0a29a"><span>Pins</span></button>
+        <button class="dtab" data-dt="routes" role="tab" style="--tc:#9cc3ee"><span>Routes</span></button>
+        <button class="dtab" data-dt="rides" role="tab" style="--tc:#a6d99a"><span>Rides</span></button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Generic dialog -->
+  <div id="dialog" class="overlay" hidden>
+    <div class="overlay-panel dialog-panel" id="dialogBody"></div>
+  </div>
+
+  <!-- Confirm / text prompt (replaces native dialogs) -->
+  <div id="ask" class="overlay ask" hidden>
+    <div class="ask-panel" role="alertdialog" aria-modal="true" aria-labelledby="askText">
+      <h2 id="askTitle" hidden></h2>
+      <p id="askText"></p>
+      <input id="askInput" type="text" autocomplete="off" hidden>
+      <div class="ask-actions">
+        <button id="askCancel" class="secondary-btn">Cancel</button>
+        <button id="askOk" class="primary-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lock mode: swallows every touch until the slider is dragged to the end -->
+  <div id="lock" hidden tabindex="-1">
+    <div class="lock-track"><span class="lock-label">Slide to unlock</span><div class="lock-knob"><svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z"/></svg></div></div>
+  </div>
+
+  <!-- Pick an area to download -->
+  <div id="pickFrame" hidden>
+    <i class="ph" data-c="nw"></i><i class="ph" data-c="ne"></i><i class="ph" data-c="sw"></i><i class="ph" data-c="se"></i>
+  </div>
+  <section id="pickSheet" class="sheet" hidden>
+    <div id="pickName" class="pick-name"></div>
+    <div id="pickInfo" class="pick-info"></div>
+    <div class="sheet-actions">
+      <button id="pickCancel" class="secondary-btn">Cancel</button>
+      <button id="pickGo" class="primary-btn" disabled>Download</button>
+    </div>
+  </section>
+  <section id="dlCard" class="card" hidden>
+    <div class="dl-head"><b id="dlName"></b><span id="dlPct"></span></div>
+    <div id="dlLabel" class="dl-label"></div>
+    <div class="off-bar"><i id="dlBar"></i></div>
+    <button id="dlCancel" class="secondary-btn">Cancel download</button>
+  </section>
+
+  <div id="offlineChip" class="offline-chip" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+  <input id="fileInput" type="file" hidden>
+
+  <script src="vendor/leaflet.js"></script>
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="vendor/leaflet-maplibre-gl.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
