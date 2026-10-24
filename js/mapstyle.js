@@ -60,6 +60,8 @@ async function loadBase() {
   return structuredClone(baseStyle);
 }
 
+export const BIKE_POI = ['bicycle_parking', 'bicycle', 'drinking_water', 'toilets'];
+
 export async function calmStyle(dark) {
   const P = PALETTES[dark ? 'dark' : 'light'];
   const style = await loadBase();
@@ -109,6 +111,22 @@ export async function calmStyle(dark) {
       'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.8, 15, 2, 18, 5],
       'line-opacity': 0.85,
     },
+  });
+
+  // Dashed brown line for unpaved roads and tracks; only shown for mountain bikes (see syncBikeLayers in app.js).
+  const symAt = style.layers.findIndex(l => l.type === 'symbol');
+  style.layers.splice(symAt < 0 ? style.layers.length : symAt, 0, {
+    id: 'unpaved-mtb', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', minzoom: 12,
+    filter: ['all', ['!', ['in', ['get', 'class'], ['literal', ['rail', 'transit', 'motorway', 'ferry']]]], ['any', ['==', ['get', 'surface'], 'unpaved'], ['==', ['get', 'class'], 'track']]],
+    layout: { visibility: 'none', 'line-cap': 'butt' },
+    paint: { 'line-color': dark ? '#c9a58f' : '#8d6e63', 'line-dasharray': [2, 2], 'line-opacity': 0.9, 'line-width': ['interpolate', ['exponential', 1.5], ['zoom'], 12, 0.8, 15, 2, 18, 5] },
+  });
+
+  // Bike essentials: parking, bike shops, drinking water and toilets as small badges (images made on demand, see bikeBadge in app.js).
+  style.layers.push({
+    id: 'bike-essentials', type: 'symbol', source: 'openmaptiles', 'source-layer': 'poi', minzoom: 15,
+    filter: ['in', ['get', 'class'], ['literal', BIKE_POI]],
+    layout: { 'icon-image': ['concat', 'bk-', ['get', 'class']], 'icon-size': ['interpolate', ['linear'], ['zoom'], 15, 0.6, 17, 0.85], 'icon-allow-overlap': false, 'icon-padding': 2, 'symbol-sort-key': ['get', 'rank'] },
   });
 
   // Fake building height for the tilted 3D view: stacked flat fills, shifted "up" on screen

@@ -865,3 +865,10 @@ body.drawer-open #recenterBtn { display: none; }
 #radarBtn.active { background: var(--accent); color: var(--on-accent); }
 .radar-time { position: fixed; bottom: calc(24px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); z-index: 900; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; background: var(--surface); color: var(--text); box-shadow: var(--shadow); pointer-events: none; white-space: nowrap; }
 .radar-time[hidden] { display: none; }
+
+.map-popup small { color: var(--muted); font-size: 12px; margin-top: -4px; }
+.along-row { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: none; }
+.along-row:empty, .sheet.collapsed .along-row { display: none; }
+.along-chip { flex: none; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 11px; white-space: nowrap; }
+.along-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.along-icon span { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #fff; border: 2.5px solid var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.35); font-size: 15px; }

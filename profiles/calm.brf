@@ -67,6 +67,8 @@ assign   risky_crossing_cost      = 60     # %risky_crossing_cost% | Extra cost 
 assign processUnusedTags            = false # %processUnusedTags% | Set true to output unused tags in data tab | boolean
 
 ---context:way   # following code refers to way-tags
+# referenced so the route response reports bridges and tunnels (shown as route events)
+assign is_brunnel = or bridge=yes tunnel=yes
 
 # classifier constants
 assign classifier_none  = 1

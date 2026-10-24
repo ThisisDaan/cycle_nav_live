@@ -17,7 +17,7 @@ export const ROUTE_STYLES = {
   offroad:  { label: 'Off-road', desc: 'Trails, gravel and forest paths (MTB)',   turn_penalty: 100, neighbourhood_penalty: 1.3,  mainroad_penalty: 1.3, signal_cost: 30, offroad: true },
 };
 
-let template = null;
+const templates = {};
 const uploads = new Map(loadProfileCache());
 
 function loadProfileCache() {
@@ -27,13 +27,13 @@ function saveProfileCache() {
   try { sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify([...uploads])); } catch { /* ignore */ }
 }
 
-export function profileParams(bike) {
+export function profileParams(bike, profile = 'calm') {
   const style = ROUTE_STYLES[bike.style] || ROUTE_STYLES.calm;
   return {
     turn_penalty: style.turn_penalty,
     neighbourhood_penalty: style.neighbourhood_penalty,
     mainroad_penalty: style.mainroad_penalty,
-    signal_cost: style.signal_cost,
+    signal_cost: profile === 'nostops' ? 250 : style.signal_cost,
     // E-bikes don't care much about hills; everyone else avoids pointless climbing.
     consider_elevation: bike.avoidHills === false || bike.type === 'ebike' ? 'false' : 'true',
     allow_steps: bike.type === 'cargo' ? 'false' : 'true',
@@ -67,8 +67,8 @@ export function routingMode() {
   return native.available() && localSegments.size ? 'offline' : 'none';
 }
 
-async function profileText(params) {
-  if (!template) template = await fetch('profiles/calm.brf').then(r => r.text());
+async function profileText(params, profile = 'calm') {
+  const template = templates[profile] ||= await fetch(`profiles/${profile}.brf`).then(r => r.text());
   let text = template;
   for (const [k, v] of Object.entries(params)) {
     // Only the first `assign <name> =` is the parameter definition.
@@ -77,10 +77,10 @@ async function profileText(params) {
   return text;
 }
 
-async function profileId(params, force = false) {
-  const text = await profileText(params);
-  // Include the profile's size so an updated calm.brf gets uploaded again.
-  const key = JSON.stringify(params) + template.length;
+async function profileId(params, force = false, profile = 'calm') {
+  const text = await profileText(params, profile);
+  // Include the profile's size so an updated .brf gets uploaded again.
+  const key = profile + JSON.stringify(params) + text.length;
   if (!force && uploads.has(key)) return uploads.get(key);
   const res = await timedFetch(`${BASE}/profile`, { method: 'POST', body: text });
   const json = await res.json();
@@ -91,34 +91,34 @@ async function profileId(params, force = false) {
 }
 
 // Fetch one route. `points` = [[lat, lon], ...] (start, vias..., end).
-export async function fetchRoute(points, bike, alternative = 0) {
-  if (navigator.onLine === false || Date.now() < downUntil) return fetchRouteOffline(points, bike, alternative);
+export async function fetchRoute(points, bike, alternative = 0, profile = 'calm') {
+  if (navigator.onLine === false || Date.now() < downUntil) return fetchRouteOffline(points, bike, alternative, profile);
   try {
-    return await fetchRouteOnline(points, bike, alternative);
+    return await fetchRouteOnline(points, bike, alternative, profile);
   } catch (e) {
     // Network error / timeout (not a routing answer from the server): use the embedded router.
     if (e.routing || !native.available()) throw e;
     downUntil = Date.now() + OFFLINE_RETRY_AFTER;
-    return fetchRouteOffline(points, bike, alternative);
+    return fetchRouteOffline(points, bike, alternative, profile);
   }
 }
 
-async function fetchRouteOffline(points, bike, alternative) {
+async function fetchRouteOffline(points, bike, alternative, profile) {
   if (!native.available()) throw new Error(t('No offline routing data for this area'));
   await refreshOfflineSegments();
   if (!native.segmentsForPoints(points).every(n => localSegments.has(n))) {
     throw new Error(t('No offline routing data for this area'));
   }
-  const text = await profileText(profileParams(bike));
+  const text = await profileText(profileParams(bike, profile), profile);
   return parseRoute(JSON.parse(await native.route(points, text, {}, alternative)));
 }
 
-async function fetchRouteOnline(points, bike, alternative) {
-  const params = profileParams(bike);
+async function fetchRouteOnline(points, bike, alternative, profile) {
+  const params = profileParams(bike, profile);
   const lonlats = points.map(p => `${p[1].toFixed(6)},${p[0].toFixed(6)}`).join('|');
   let lastErr;
   for (const force of [false, true]) {
-    const id = await profileId(params, force);
+    const id = await profileId(params, force, profile);
     const url = `${BASE}?lonlats=${lonlats}&profile=${id}&alternativeidx=${alternative}&format=geojson&timode=2`;
     const res = await timedFetch(url);
     const body = await res.text();

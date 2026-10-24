@@ -66,8 +66,10 @@ export function analyse(rows, coords) {
   const iW = head.indexOf('WayTags'), iN = head.indexOf('NodeTags');
   if (iLon < 0 || iW < 0) return out;
 
-  let ci = 0, prev = 0;
+  let ci = 0, prev = 0, run = null;
   const seg = [];
+  // one icon per continuous bridge / tunnel (skipping tiny ones, e.g. over a ditch)
+  const endRun = () => { if (run && run.m >= 40) out.events.push({ type: run.type, idx: run.idx, latlng: run.latlng }); run = null; };
   const close = (k, lat, lon) => Math.abs(coords[k][1] - lon) < 3e-6 && Math.abs(coords[k][0] - lat) < 3e-6;
   for (const row of rows.slice(1)) {
     const lon = Number(row[iLon]) / 1e6, lat = Number(row[iLat]) / 1e6;
@@ -78,6 +80,9 @@ export function analyse(rows, coords) {
     const tags = row[iW] || '';
     const d = Number(row[iD]) || 0;
     if (ci > prev) {
+      const o = parse(tags), bt = o.tunnel && o.tunnel !== 'no' ? 'tunnel' : o.bridge && o.bridge !== 'no' ? 'bridge' : null;
+      if (run && run.type !== bt) endRun();
+      if (bt) { if (!run) run = { type: bt, idx: prev, latlng: [coords[prev][0], coords[prev][1]], m: 0 }; run.m += d; }
       const cls = classify(tags);
       const last = seg[seg.length - 1];
       if (last && last.cls === cls) { last.b = ci; last.m += d; } else seg.push({ cls, a: prev, b: ci, m: d });
@@ -98,6 +103,7 @@ export function analyse(rows, coords) {
       }
     }
   }
+  endRun();
   out.segments = seg;
   for (const s of seg) if (s.cls === 'busy' && (!out.longestBusy || s.m > out.longestBusy.m)) out.longestBusy = s;
   return out;

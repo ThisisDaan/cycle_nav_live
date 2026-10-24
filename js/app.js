@@ -6,7 +6,7 @@ import { bikeSpeed, buildIndex, familiarity, findFamiliar, viaPointsFor } from '
 import { Navigator, Recorder, Simulator } from './nav.js';
 import { initNative, isNative, keepAwake, onBackButton, saveFile, speak, stopSpeaking } from './native.js';
 import { ACCENTS, APP_ICONS, MAP_STYLES, MARKERS, applyTheme, iconSvg, tileStyle } from './theme.js';
-import { applyBuildings, calmStyle } from './mapstyle.js';
+import { applyBuildings, BIKE_POI, calmStyle } from './mapstyle.js';
 import * as offline from './offline.js';
 import { CLASS_COLORS, CLASS_ORDER } from './roadclass.js';
 import * as bnative from './brouter-native.js';
@@ -270,8 +270,8 @@ function setupMap() {
   addEventListener('touchstart', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, { capture: true, passive: true });
   addEventListener('mousedown', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, true);
   setupTwist();
-  map.on('click', () => { hideSuggestions(); $('#bikeMenu').hidden = true; });
-  map.on('contextmenu', e => !picking && dropPin([e.latlng.lat, e.latlng.lng]));
+  map.on('click', e => { hideSuggestions(); $('#bikeMenu').hidden = true; tapMap(e); });
+  map.on('contextmenu', e => { lastCtx = Date.now(); if (!picking) dropPin([e.latlng.lat, e.latlng.lng]); });
 }
 
 async function setTiles() {
@@ -304,7 +304,7 @@ async function setTiles() {
   if (tiles) map.removeLayer(tiles);
   tiles = layer.addTo(map);
   const gl = tiles.getMaplibreMap?.();
-  if (gl) { gl.on('load', syncGL); syncGL(); }
+  if (gl) { gl.on('load', syncGL); gl.on('styleimagemissing', e => bikeBadge(gl, e.id)); syncGL(); }
 }
 
 // The GL map lives inside the CSS-rotated #map. To keep street names upright, its container is turned
@@ -356,6 +356,82 @@ function syncGL() {
   turnGL(gl, renderedRot());
   // lift is smaller when the map is not tipped back (planner)
   applyBuildings(gl, buildings3d(), map.getZoom(), tilted ? 1.9 : 1.1);
+  syncBikeLayers(gl);
+}
+
+// bike essentials follow the settings toggle; unpaved roads are dashed only for a mountain bike
+function syncBikeLayers(gl) {
+  const on = S().bikePois !== false, mtb = store.activeBike()?.type === 'mtb', key = `${on}${mtb}`;
+  if (gl._bk === key || !gl.getLayer('bike-essentials')) return;
+  gl._bk = key;
+  gl.setLayoutProperty('bike-essentials', 'visibility', on ? 'visible' : 'none');
+  gl.setLayoutProperty('unpaved-mtb', 'visibility', mtb ? 'visible' : 'none');
+}
+
+const BADGES = { bicycle_parking: ['P', '#1a73e8'], bicycle: ['🔧', '#e8710a'], drinking_water: ['💧', '#0b8ec9'], toilets: ['🚻', '#6b5bd2'] };
+function bikeBadge(gl, id) {
+  const b = BADGES[id.replace(/^bk-/, '')];
+  if (!b || gl.hasImage(id)) return;
+  const c = document.createElement('canvas'), r = 2;
+  c.width = c.height = 32 * r;
+  const g = c.getContext('2d');
+  g.scale(r, r);
+  g.beginPath(); g.arc(16, 16, 14, 0, 7); g.fillStyle = '#fff'; g.fill();
+  g.lineWidth = 2.5; g.strokeStyle = b[1]; g.stroke();
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (b[0] === 'P') { g.fillStyle = b[1]; g.font = 'bold 19px sans-serif'; g.fillText('P', 16, 17); }
+  else { g.font = '16px sans-serif'; g.fillText(b[0], 16, 17); }
+  gl.addImage(id, g.getImageData(0, 0, c.width, c.height), { pixelRatio: r });
+}
+
+// ---- tapping a business / place on the map (OpenMapTiles `poi` layer)
+const POI_TYPES = {
+  bicycle_parking: 'Bicycle parking', bicycle: 'Bike shop', drinking_water: 'Drinking water', toilets: 'Toilets', cafe: 'Café',
+  restaurant: 'Restaurant', fast_food: 'Fast food', bar: 'Bar', pub: 'Pub', supermarket: 'Supermarket', grocery: 'Grocery', bakery: 'Bakery',
+  pharmacy: 'Pharmacy', hospital: 'Hospital', doctors: 'Doctor', dentist: 'Dentist', school: 'School', library: 'Library', post: 'Post office',
+  bank: 'Bank', atm: 'ATM', fuel: 'Fuel station', parking: 'Parking', park: 'Park', playground: 'Playground', museum: 'Museum', hotel: 'Hotel',
+  bus: 'Bus stop', rail: 'Train station', airport: 'Airport', clothing_store: 'Clothes shop', florist: 'Florist', butcher: 'Butcher',
+};
+const poiType = p => { const k = POI_TYPES[p.subclass] || POI_TYPES[p.class] || (p.subclass || p.class || '').replace(/_/g, ' '); return t(k.charAt(0).toUpperCase() + k.slice(1)); };
+var lastCtx = 0;
+
+function poiAt(e) {
+  const gl = tiles?.getMaplibreMap?.();
+  if (!gl) return null;
+  const layers = ['bike-essentials', 'poi_r1', 'poi_r7', 'poi_transit'].filter(id => gl.getLayer(id));
+  if (!layers.length) return null;
+  const pt = gl.project([e.latlng.lng, e.latlng.lat]);
+  let best = null;
+  for (const f of gl.queryRenderedFeatures([[pt.x - 18, pt.y - 18], [pt.x + 18, pt.y + 18]], { layers })) {
+    const p = f.properties || {};
+    if (f.geometry?.type !== 'Point' || !(p.name || BIKE_POI.includes(p.class))) continue;
+    const q = gl.project(f.geometry.coordinates), d = Math.hypot(q.x - pt.x, q.y - pt.y);
+    if (!best || d < best.d) best = { d, p, ll: [f.geometry.coordinates[1], f.geometry.coordinates[0]] };
+  }
+  return best;
+}
+
+function placePopupHtml(name, sub, only) {
+  return `<div class="map-popup"><b class="selectable">${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}${only === 'via' ? '' : '<button data-a="from">Directions from here</button>'}${
+    options.length ? '<button data-a="via">Go via here</button>' : ''}${only === 'via' ? '' : `<button class="go" data-a="to">Directions to here</button><button data-a="pin">${BOOKMARK_SVG} Save as pin</button>`}</div>`;
+}
+function openPlacePopup(latlng, name, sub, only) {
+  if (nav) return;
+  if (fol.mode && !fol.paused) pauseFollow();
+  const place = { name, detail: sub || '', latlng };
+  const popup = L.popup({ closeButton: false, offset: [0, -4] }).setLatLng(latlng).setContent(placePopupHtml(name, sub, only)).openOn(map);
+  popup.getElement()?.querySelectorAll('button').forEach(b => b.onclick = () => {
+    map.closePopup();
+    if (b.dataset.a === 'via') addVia(latlng);
+    else if (b.dataset.a === 'pin') editPin(null, { name, latlng });
+    else choosePlace(b.dataset.a, place);
+  });
+}
+function tapMap(e) {
+  if (nav || picking || Date.now() - lastCtx < 700) return;
+  if (e.originalEvent?.target?.closest?.('.leaflet-marker-icon, .leaflet-interactive, .leaflet-popup')) return;
+  const hit = poiAt(e);
+  if (hit) openPlacePopup(hit.ll, hit.p.name || poiType(hit.p), hit.p.name ? poiType(hit.p) : '');
 }
 
 // The CSS rotation animates over ROT_MS; read the angle it is *actually* showing (computed style),
@@ -390,8 +466,7 @@ async function dropPin(latlng) {
   if (nav) return;
   if (fol.mode && !fol.paused) pauseFollow();
   // start · via · end, in the order you'd plan a ride
-  const html = name => `<div class="map-popup"><b class="selectable">${esc(name)}</b><button data-a="from">Directions from here</button>${
-    options.length ? '<button data-a="via">Go via here</button>' : ''}<button class="go" data-a="to">Directions to here</button><button data-a="pin">${BOOKMARK_SVG} Save as pin</button></div>`;
+  const html = name => placePopupHtml(name);
   const popup = L.popup({ closeButton: false, offset: [0, -4] })
     .setLatLng(latlng)
     .setContent(html('Dropped pin'))
@@ -827,9 +902,10 @@ async function planRoute({ fit = true } = {}) {
     vias = vias.map(v => Object.assign(route.coords.reduce((best, c) => dist(c, v) < dist(best, v) ? c : best).slice(), { gpx: v.gpx, name: v.name, city: v.city }));
     list.push({ route, kind: 'custom' });
   } else {
-    const [alts, familiar] = await Promise.all([
+    const [alts, familiar, nostops] = await Promise.all([
       fetchAlternatives(a, b, bike).catch(e => e),
       familiarRoute(a, b, bike),
+      fetchRoute([a, b], bike, 0, 'nostops').catch(() => null),
     ]);
     if (token !== planToken) return;
     if (familiar) list.push({ route: familiar, kind: 'familiar' });
@@ -838,6 +914,11 @@ async function planRoute({ fit = true } = {}) {
         if (familiar && Math.abs(route.length - familiar.length) < 40 && Math.abs(route.stats.turns - familiar.stats.turns) <= 1) return;
         list.push({ route, kind: 'alt' });
       });
+    }
+    if (nostops && list.length) {
+      const dup = list.find(o => Math.abs(o.route.length - nostops.length) < 15 && o.route.stats.turns === nostops.stats.turns);
+      if (!dup) list.push({ route: nostops, kind: 'nostops' });
+      else if (dup.route.stats.signals <= Math.min(...list.map(o => o.route.stats.signals))) dup.fewestStops = true;
     }
     if (!list.length) {
       $('#routeStatus').textContent = t("Couldn't find a route: {0}", alts?.message || '?');
@@ -897,8 +978,10 @@ async function familiarRoute(a, b, bike) {
 
 function selectRoute(i, fit = false) {
   selected = i;
+  clearAlong();
   scheduleSession();
   renderRouteCards();
+  renderAlong();
   drawRoutes();
   $('#startBtn').disabled = false;
   if (fit) {
@@ -926,6 +1009,7 @@ function renderRouteCards() {
       familiar: t('Your usual way'),
       custom: gpxRoute ? `GPX: ${esc(gpxRoute.name)}` : t('Your route'),
       calm: t(ROUTE_STYLES[store.activeBike().style]?.offroad ? 'Most off-road' : 'Calmest'),
+      nostops: t('Fewest stops'),
     }[o.kind] || t(o.shortest ? 'Shorter' : 'Alternative');
     const tags = [];
     if (o.kind === 'familiar') tags.push(`<span class="tag">${r.saved && r.ridden === 1 ? t('saved by you') : t('ridden {0}×', r.ridden)}</span>`);
@@ -933,6 +1017,7 @@ function renderRouteCards() {
     const added = vias.filter(v => !v.gpx).length;
     if (o.kind === 'custom' && gpxRoute) tags.push('<span class="tag">follows your GPX</span>');
     if (o.kind === 'custom' && added) tags.push(`<span class="tag">${added > 1 ? t('{0} points added', added) : t('1 point added')}</span>`);
+    if (o.kind === 'nostops' || o.fewestStops) tags.push(`<span class="tag">${o.kind === 'nostops' ? '' : `${t('Fewest stops')} · `}${r.stats.signals ? (r.stats.signals > 1 ? t('{0} traffic lights', r.stats.signals) : t('1 traffic light')) : t('No traffic lights')}</span>`);
     if (o.fewestTurns) tags.push('<span class="tag">fewest turns</span>');
     if (r.stats.busyShare > 0.08) tags.push(`<span class="tag warn">${t('{0}% busy road', Math.round(r.stats.busyShare * 100))}</span>`);
     const meta = r.stats.meters && Object.keys(r.stats.meters).length ? [t('{0} turns', r.stats.turns)] : [t('{0}% bike paths/lanes', Math.round(r.stats.bikeShare * 100)), t('{0} turns', r.stats.turns)];
@@ -1000,11 +1085,15 @@ const LEGEND = {
 const SIGNAL_SVG = '<svg viewBox="0 0 24 24" width="19" height="19"><rect x="7" y="2" width="10" height="20" rx="4" fill="#2b2f33"/><circle cx="12" cy="7" r="2.2" fill="#e5484d"/><circle cx="12" cy="12" r="2.2" fill="#f5c542"/><circle cx="12" cy="17" r="2.2" fill="#3fb36b"/></svg>';
 const RISKY_SVG = '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 2.5 22.5 21h-21z" fill="#f5c542" stroke="#b3261e" stroke-width="2" stroke-linejoin="round"/><rect x="11" y="9" width="2" height="6" rx="1" fill="#b3261e"/><circle cx="12" cy="17.6" r="1.2" fill="#b3261e"/></svg>';
 
+const BRIDGE_SVG = '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="11" fill="#fff" stroke="#5f6b73" stroke-width="1.5"/><path d="M3.5 15h17M5 15c1.5-5 4-6.500 7-6.500s5.500 1.500 7 6.500M8 15v-4M12 15V8.500M16 15v-4" fill="none" stroke="#2b2f33" stroke-width="1.500" stroke-linecap="round"/></svg>';
+const TUNNEL_SVG = '<svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="11" fill="#fff" stroke="#5f6b73" stroke-width="1.5"/><path d="M5 18v-6a7 7 0 0 1 14 0v6z" fill="#5f6b73"/><path d="M9 18v-5a3 3 0 0 1 6 0v5z" fill="#fff"/></svg>';
+const EVENT_SVG = { signal: SIGNAL_SVG, risky: RISKY_SVG, bridge: BRIDGE_SVG, tunnel: TUNNEL_SVG };
+
 function drawEvents(r) {
   for (const e of r.events || []) {
     L.marker(e.latlng, {
       interactive: false, keyboard: false, zIndexOffset: -100,
-      icon: L.divIcon({ className: `ev-icon ev-${e.type}`, html: e.type === 'signal' ? SIGNAL_SVG : RISKY_SVG, iconSize: [22, 22], iconAnchor: [11, 11] }),
+      icon: L.divIcon({ className: `ev-icon ev-${e.type}`, html: EVENT_SVG[e.type] || RISKY_SVG, iconSize: [22, 22], iconAnchor: [11, 11] }),
     }).addTo(routeLayer);
   }
 }
@@ -1158,6 +1247,72 @@ function enableLineDrag(el, route) {
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
   });
+}
+
+// ---- search along the route (Overpass): cafés, toilets, drinking water, bike shops within 150 m
+const ALONG = {
+  cafe: ['☕', 'Café', '"amenity"="cafe"'], toilets: ['🚻', 'Toilet', '"amenity"="toilets"'],
+  water: ['💧', 'Drinking water', '"amenity"="drinking_water"'], bike: ['🔧', 'Bike shop', '"shop"="bicycle"'],
+};
+var along = null, alongToken = 0;
+
+function renderAlong() {
+  const row = $('#alongRow');
+  row.innerHTML = Object.entries(ALONG).map(([k, a]) => `<button class="along-chip${along?.key === k ? ' on' : ''}" data-k="${k}"><span>${a[0]}</span> ${t(a[1])}</button>`).join('');
+  row.querySelectorAll('button').forEach(b => b.onclick = () => searchAlong(b.dataset.k));
+}
+
+function clearAlong() {
+  alongToken++;
+  const had = along;
+  along = null;
+  had?.layer.remove();
+  if (had) renderAlong();
+}
+
+async function searchAlong(key) {
+  if (along?.key === key) return clearAlong();
+  const route = options[selected]?.route;
+  if (!route) return;
+  clearAlong();
+  const token = alongToken, a = ALONG[key];
+  along = { key, layer: L.layerGroup().addTo(map) };
+  const layer = along.layer;
+  renderAlong();
+  let pts = simplify(route.coords, 40);
+  for (let tol = 80; pts.length > 120; tol *= 1.6) pts = simplify(route.coords, tol);
+  const poly = pts.map(p => `${p[0].toFixed(5)},${p[1].toFixed(5)}`).join(',');
+  let els;
+  try {
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST', signal: AbortSignal.timeout(12000),
+      body: 'data=' + encodeURIComponent(`[out:json][timeout:10];nwr[${a[2]}](around:150,${poly});out center 120;`),
+    });
+    if (!res.ok) throw new Error(res.status);
+    els = (await res.json()).elements || [];
+  } catch {
+    if (token === alongToken) { clearAlong(); toast(t('Search along the route needs a connection')); }
+    return;
+  }
+  if (token !== alongToken) return;
+  const found = [];
+  for (const el of els) {
+    const ll = [el.lat ?? el.center?.lat, el.lon ?? el.center?.lon];
+    if (ll[0] == null) continue;
+    let best = { d: Infinity, m: 0 };
+    for (let i = 0; i < route.coords.length - 1; i++) {
+      const r = projectOnSegment(ll, route.coords[i], route.coords[i + 1]);
+      if (r.d < best.d) best = { d: r.d, m: route.cum[i] + r.t * (route.cum[i + 1] - route.cum[i]) };
+    }
+    if (best.d <= 170) found.push({ ll, m: best.m, name: el.tags?.name });
+  }
+  found.sort((x, y) => x.m - y.m);
+  if (!found.length) { clearAlong(); toast(t('Nothing found within 150 m of the route')); return; }
+  for (const f of found.slice(0, 30)) {
+    L.marker(f.ll, { icon: L.divIcon({ className: 'along-icon', html: `<span>${a[0]}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 200 })
+      .on('click', () => openPlacePopup(f.ll, f.name || t(a[1]), t('{0} along the route', fmtDist(f.m)), 'via'))
+      .addTo(layer);
+  }
 }
 
 // ---- shaping the route by hand (via points)
@@ -1382,6 +1537,7 @@ function drawEndpoints(a, b) {
 
 function clearRoutes() {
   planToken++;
+  clearAlong();
   scheduleSession();
   options = [];
   vias = [];
@@ -2353,6 +2509,7 @@ function showRiddenRoads(on) {
 // ---------------------------------------------------------------- bikes
 
 function renderBikeChip() {
+  syncGL();
   const b = store.activeBike();
   const sp = bikeSpeed(b, rideList);
   $('#bikeChip').innerHTML = `<span class="bike-badge" style="--bike:${esc(b.color)}">${esc(b.icon)}</span>
@@ -2508,6 +2665,7 @@ function moreTab() {
       <div class="field"><span>Map while navigating</span><div class="choices">${Object.entries(ORIENTATIONS).map(([k, o]) => `<button class="choice ${S().orientation === k ? 'selected' : ''}" data-orient="${k}">${o.label}<small>${o.desc}</small></button>`).join('')}</div></div>
       <label class="toggle"><span>${t('Ride weather advice')}</span><input type="checkbox" id="optWx" ${wxOn() ? 'checked' : ''}></label>
       <label class="toggle"><span>${t('3D buildings and view')}</span><input type="checkbox" id="optView3d" ${S().view3d !== false ? 'checked' : ''}></label>
+      <label class="toggle"><span>${t('Bike essentials on the map')}</span><input type="checkbox" id="optBikePois" ${S().bikePois !== false ? 'checked' : ''}></label>
       <label class="toggle"><span>Demo mode (simulate riding the route)</span><input type="checkbox" id="optDemo" ${S().demo ? 'checked' : ''}></label>
       <p class="hint">Demo mode lets you try navigation at your desk. Simulated rides can still be saved, so discard them.</p>
     </div>
@@ -2557,6 +2715,7 @@ function wireSettings(tab, body) {
     on('#optVoice', 'onchange', e => store.update(s => { s.voice = e.target.checked; }));
     on('#optLightHint', 'onchange', e => store.update(s => { s.lightHint = e.target.checked; }));
     on('#optWx', 'onchange', e => { store.update(s => { s.wx = e.target.checked; }); wxUpdate(); });
+    on('#optBikePois', 'onchange', e => { store.update(s => { s.bikePois = e.target.checked; }); syncGL(); });
     on('#optView3d', 'onchange', e => { store.update(s => { s.view3d = e.target.checked; }); if (nav) setNavFrame(true); else syncGL(); });
     on('#optDemo', 'onchange', e => store.update(s => { s.demo = e.target.checked; }));
     on('[data-lang]', 'onclick', e => {
