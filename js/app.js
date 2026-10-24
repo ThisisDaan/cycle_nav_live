@@ -1278,6 +1278,15 @@ function onNavFix(fix) {
 
   const st = nav.navigator.update(fix.latlng, fix.accuracy);
   nav.last = st;
+  // GPS wanders a few metres: pull the marker onto the line when it's close (fully within 20 m,
+  // easing off to nothing at 35 m), so you clearly see yourself on the route.
+  const k = st.offRoute ? 0 : st.offBy <= 20 ? 1 : Math.max(0, (35 - st.offBy) / 15);
+  if (k > 0 && meMarker) {
+    const ll = [fix.latlng[0] + (st.snap[0] - fix.latlng[0]) * k, fix.latlng[1] + (st.snap[1] - fix.latlng[1]) * k];
+    meMarker.setLatLng(ll);
+    accuracyCircle?.setLatLng(ll);
+    fix = { ...fix, latlng: ll };
+  }
   followCamera(fix, st);
   if (!st.offRoute) nav.along = st.along;
   checkStops(fix);

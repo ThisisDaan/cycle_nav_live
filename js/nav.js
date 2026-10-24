@@ -54,7 +54,9 @@ export class Navigator {
         say = t('In {0} metres, {1}', Math.round(distToNext / 50) * 50, text.charAt(0).toLowerCase() + text.slice(1));
       }
     }
-    return { along, remaining, offRoute, offBy: best.d, next, after, afterGap, thenSoon, distToNext, arrived, say };
+    const c0 = coords[best.i], c1 = coords[best.i + 1] || c0;
+    const snap = [c0[0] + (c1[0] - c0[0]) * best.t, c0[1] + (c1[1] - c0[1]) * best.t];
+    return { along, remaining, offRoute, offBy: best.d, snap, next, after, afterGap, thenSoon, distToNext, arrived, say };
   }
 
   nearest(p, from, to) {
