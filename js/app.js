@@ -419,10 +419,38 @@ function drawMe(rebuild = false) {
     }).addTo(map);
     accuracyCircle = accuracyCircle || L.circle(me.latlng, { radius: me.accuracy, stroke: false, fillColor: S().theme.accent, fillOpacity: .12, interactive: false }).addTo(map);
   }
-  meMarker.setLatLng(me.latlng);
-  accuracyCircle.setLatLng(me.latlng).setRadius(Math.min(me.accuracy || 0, 200));
+  moveMe(me.latlng);
+  accuracyCircle.setRadius(Math.min(me.accuracy || 0, 200));
   accuracyCircle.setStyle({ fillColor: S().theme.accent });
   applyHeading();
+}
+
+// GPS fixes arrive about once a second: glide the marker to each new spot over roughly that
+// interval instead of jumping, like a car navigation arrow.
+const meGlide = { from: null, to: null, t0: 0, ms: 1000, last: 0, raf: 0 };
+function moveMe(ll) {
+  const now = performance.now(), g = meGlide;
+  const cur = g.to ? glidePos(now) : null;
+  if (g.to && g.to[0] === ll[0] && g.to[1] === ll[1]) return;
+  // re-targeting within the same fix (snapped onto the route) keeps the same start and clock
+  if (now - g.last > 50 || !cur) {
+    g.ms = Math.min(1200, Math.max(250, now - (g.last || now - 1000)));
+    g.from = cur || ll; g.t0 = now; g.last = now;
+  }
+  g.to = ll;
+  const far = g.from && dist(g.from, ll) > 300; // a big jump (new fix after a gap): no slow slide across town
+  if (far || matchMedia('(prefers-reduced-motion: reduce)').matches) g.from = ll;
+  if (!g.raf) g.raf = requestAnimationFrame(glideTick);
+}
+function glidePos(now) {
+  const g = meGlide, k = Math.min(1, (now - g.t0) / g.ms);
+  return [g.from[0] + (g.to[0] - g.from[0]) * k, g.from[1] + (g.to[1] - g.from[1]) * k];
+}
+function glideTick() {
+  const g = meGlide, now = performance.now(), p = glidePos(now);
+  meMarker?.setLatLng(p);
+  accuracyCircle?.setLatLng(p);
+  g.raf = now - g.t0 < g.ms ? requestAnimationFrame(glideTick) : 0;
 }
 
 // ---------------------------------------------------------------- planner
@@ -1283,8 +1311,7 @@ function onNavFix(fix) {
   const k = st.offRoute ? 0 : st.offBy <= 20 ? 1 : Math.max(0, (35 - st.offBy) / 15);
   if (k > 0 && meMarker) {
     const ll = [fix.latlng[0] + (st.snap[0] - fix.latlng[0]) * k, fix.latlng[1] + (st.snap[1] - fix.latlng[1]) * k];
-    meMarker.setLatLng(ll);
-    accuracyCircle?.setLatLng(ll);
+    moveMe(ll);
     fix = { ...fix, latlng: ll };
   }
   followCamera(fix, st);
@@ -1559,7 +1586,8 @@ function followCamera(fix, st) {
     if (Math.abs(z - map.getZoom()) < 0.3) z = map.getZoom();
   }
   nav.wantZoom = z;
-  map.setView(fix.latlng, z, { animate: true });
+  // pan at the same steady pace as the marker glides, so it stays put on screen
+  map.setView(fix.latlng, z, { animate: true, pan: { duration: meGlide.ms / 1000, easeLinearity: 1 } });
 }
 
 function recenter() {
