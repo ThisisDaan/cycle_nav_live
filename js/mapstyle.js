@@ -123,6 +123,12 @@ export async function calmStyle(dark) {
       paint: { 'fill-color': color, 'fill-outline-color': P.wall, 'fill-antialias': true, 'fill-translate': [0, 0], 'fill-translate-anchor': 'viewport' },
     });
     for (let i = 1; i <= WALL_STEPS; i++) extra.push(make(`bld-wall${i}`, P.wall));
+    // thick outlines halfway between the slices fill the gaps, so the walls read as solid instead of stacked plates
+    for (let i = 0; i <= WALL_STEPS; i++) extra.push({
+      id: `bld-seam${i}-${k}`, type: 'line', source: 'openmaptiles', 'source-layer': 'building', minzoom: 15, filter,
+      layout: { visibility: 'none', 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': P.wall, 'line-width': 1, 'line-translate': [0, 0], 'line-translate-anchor': 'viewport' },
+    });
     extra.push(make('bld-roof', P.roof));
   });
   if (bAt >= 0) style.layers.splice(bAt + 1, 0, ...extra);
@@ -156,6 +162,16 @@ export function applyBuildings(gl, on, zoom, lift = 1.9) {
       }
       gl.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
       if (on) gl.setPaintProperty(id, 'fill-translate', [0, -q(h)]);
+    }
+    const gap = c.m * px / (WALL_STEPS + 1);
+    for (let i = 0; i <= WALL_STEPS; i++) {
+      const id = `bld-seam${i}-${k}`;
+      if (first) for (const p of ['line-translate-transition', 'line-width-transition']) gl.setPaintProperty(id, p, { duration: 0, delay: 0 });
+      gl.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      if (on) {
+        gl.setPaintProperty(id, 'line-translate', [0, -q(gap * (i + 0.5))]);
+        gl.setPaintProperty(id, 'line-width', q(gap) + 1);
+      }
     }
   });
   // the real extrusions are flat at pitch 0 and would hide the fake walls
