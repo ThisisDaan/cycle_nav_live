@@ -1499,7 +1499,7 @@ function enterNavUi(recordOnly) {
   $('#navBanner').hidden = recordOnly;
   $('#navBar').hidden = false;
   $('#navRemainLabel').textContent = recordOnly ? 'ridden' : 'to go';
-  $('#navEtaLabel').textContent = recordOnly ? 'moving' : 'arrival';
+  $('#navEtaLabel').textContent = recordOnly ? 'moving' : 'to go';
   renderVoiceBtn();
   $('#voiceBtn').hidden = recordOnly;
   $('#navButtons').hidden = false;
@@ -1542,7 +1542,9 @@ function onNavFix(fix) {
   checkStops(fix);
   renderNavDetails();
   $('#navRemain').textContent = fmtDist(st.remaining);
-  $('#navEta').textContent = fmtClock(new Date(Date.now() + st.remaining / (nav.speedKmh / 3.6) * 1000));
+  // time left is what you act on while riding; seconds once it's under a minute
+  const left = st.remaining / (nav.speedKmh / 3.6);
+  $('#navEta').textContent = left < 60 ? `${Math.max(5, Math.round(left / 5) * 5)} s` : fmtDuration(left);
 
   const banner = $('#navBanner');
   banner.classList.toggle('off-route', st.offRoute);
