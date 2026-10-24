@@ -1675,6 +1675,26 @@ async function rerouteAhead(session, ahead) {
   } catch { return direct; }
 }
 
+// Where to get back onto the route you chose: the closest point still ahead on it, favouring points in
+// your riding direction and not skipping big chunks, then guide points every ~400 m so the router keeps
+// to the rest of it. Returns [{ p, a }] with a = distance along the old route.
+function rejoinPlan(session) {
+  const r = session.route, here = me.latlng, course = session.course, end = r.cum[r.cum.length - 1];
+  let i = 0;
+  while (i < r.cum.length - 1 && r.cum[i] < session.along + 40) i++;
+  let best = null;
+  for (; i < r.coords.length && end - r.cum[i] > 150; i++) {
+    const d = dist(here, r.coords[i]);
+    let cost = d + (r.cum[i] - session.along) * 0.15;
+    if (course != null && d > 40 && Math.abs(angleDelta(course, bearing(here, r.coords[i]))) > 100) cost *= 1.6;
+    if (!best || cost < best.cost) best = { cost, i };
+  }
+  if (!best) return [];
+  const a0 = r.cum[best.i], len = end - a0, n = Math.floor(len / 400), step = len / (n + 1);
+  const guides = n > 0 ? resample(r.coords.slice(best.i), step).slice(1, n + 1) : [];
+  return [r.coords[best.i], ...guides].map((p, k) => ({ p: [p[0], p[1]], a: a0 + k * step }));
+}
+
 // direction of the first ~30 m of a route
 function startBearing(coords) {
   let i = 1;
@@ -1687,9 +1707,15 @@ async function reroute(points) {
   const session = nav;
   try {
     // Keep the points you added that are still ahead of you.
-    const ahead = points || session.vias.filter(v => alongRoute(session.route, v) > session.along + 30);
+    const vias = points || session.vias.filter(v => alongRoute(session.route, v) > session.along + 30);
+    let ahead = vias;
+    if (!points) {
+      // and steer back onto the route you chose instead of planning a brand new one
+      const guide = rejoinPlan(session);
+      if (guide.length) ahead = [...guide, ...vias.map(v => ({ p: v, a: alongRoute(session.route, v) }))].sort((x, y) => x.a - y.a).map(x => x.p);
+    }
     const route = await rerouteAhead(session, ahead);
-    session.vias = ahead;
+    session.vias = vias;
     if (nav !== session) return;
     session.route = route;
     session.navigator = new Navigator(route);
