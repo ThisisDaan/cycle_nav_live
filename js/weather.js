@@ -189,20 +189,22 @@ export function computeAdvice(route, wx, now, durSec) {
   const e0 = ex[0].e;
 
   if (isDry(e0)) {
-    // Dry now: does rain reach some spot on the route shortly after we have passed it?
+    // Dry at our exact passing times, but forecasts are never spot on: look for rain that clears just
+    // before we reach a spot (up to 10 min) or arrives just after we pass it (up to 20 min).
     const total = route.cum?.[route.cum.length - 1] ?? route.length ?? 0;
     let tight = null;
     for (const p of pts) {
       const pass = now + p.frac * durMs;
-      for (let m = 5; m <= 20; m += 5) {
+      for (const m of [-5, 5, -10, 10, 15, 20]) {
         if (rainAt(p.rain, pass + m * 60000) < WET) continue;
-        if (!tight || m < tight.m) tight = { m, p, at: pass + m * 60000 };
+        if (!tight || Math.abs(m) < Math.abs(tight.m)) tight = { m, p, at: pass + m * 60000 };
         break;
       }
     }
     if (tight) {
       const f = tight.p.frac;
       const where = f < 0.1 ? t('the start') : f > 0.9 ? t('your destination') : t('{0} km in', Math.round(f * total / 1000));
+      if (tight.m < 0) return { ...base, icon: '🧥', kind: 'close', text: t('Probably dry – rain clears at {0} only {1} before you get there, keep a jacket handy', where, mins(-tight.m)) };
       return { ...base, icon: '🏃', kind: 'rush', text: t('Leave now – rain reaches {0} around {1}, about {2} after you pass', where, clock(tight.at), mins(tight.m)) };
     }
     return { ...base, icon: '🟢', kind: 'go', text: t('Go now, dry all the way') };

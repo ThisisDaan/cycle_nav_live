@@ -356,6 +356,7 @@ const NL = {
   'Wait {0} – dry from {1}': 'Wacht {0} – droog vanaf {1}',
   "Leave now – rain arrives in {0}, you'll just stay dry": 'Ga nu – over {0} komt regen, je blijft net droog',
   'Leave now – rain reaches {0} around {1}, about {2} after you pass': 'Ga nu – rond {1} regent het bij {0}, zo’n {2} nadat je er langs bent',
+  'Probably dry – rain clears at {0} only {1} before you get there, keep a jacket handy': 'Waarschijnlijk droog – bij {0} stopt de regen pas {1} voordat je er bent, houd een jas bij de hand',
   'the start': 'het begin',
   'your destination': 'je bestemming',
   '{0} km in': 'km {0}',
