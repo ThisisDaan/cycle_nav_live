@@ -285,8 +285,9 @@ function rotTick() {
 
 async function dropPin(latlng) {
   if (nav) return;
-  const html = name => `<div class="map-popup"><b class="selectable">${esc(name)}</b><button class="go" data-a="to">Route here</button>${
-    options.length ? '<button data-a="via">Go via here</button>' : ''}<button data-a="from">Start from here</button><button data-a="pin">${BOOKMARK_SVG} Save as pin</button></div>`;
+  // start · via · end, in the order you'd plan a ride
+  const html = name => `<div class="map-popup"><b class="selectable">${esc(name)}</b><button data-a="from">Directions from here</button>${
+    options.length ? '<button data-a="via">Go via here</button>' : ''}<button class="go" data-a="to">Directions to here</button><button data-a="pin">${BOOKMARK_SVG} Save as pin</button></div>`;
   const popup = L.popup({ closeButton: false, offset: [0, -4] })
     .setLatLng(latlng)
     .setContent(html('Dropped pin'))
@@ -537,6 +538,9 @@ function choosePlace(which, place) {
   if (!place.isMe) store.addRecent({ name: place.name, detail: place.detail, latlng: place.latlng });
   syncInputs();
   if (to) planRoute(); else if (which === 'from') drawStart(resolve(from));
+  // Show the place right away; once both ends are known the route fit takes over.
+  const ll = resolve(place);
+  if (ll && !(to && resolve(from) && resolve(to))) map.flyTo(ll, Math.max(map.getZoom(), 15), { duration: 0.8 });
 }
 
 function syncInputs() {
@@ -1713,7 +1717,7 @@ function openPinPopup(id) {
   const p = S().pins.find(x => x.id === id);
   if (!p) return;
   const acts = [
-    !nav && ['to', 'Route here', 'go'],
+    !nav && ['to', 'Directions to here', 'go'],
     nav && !nav.recordOnly && ['stop', 'Add as stop', 'go'],
     ['edit', 'Edit'], ['del', 'Delete'],
   ].filter(Boolean);
@@ -2205,7 +2209,7 @@ function renderDrawer() {
   if (tab === 'pins') {
     html = items.map(p => row(p.id, `<span class="srow-ic">${esc(p.emoji)}</span>`, p.name,
       [me ? esc(t('{0} from you', fmtDist(dist(me.latlng, p.latlng)))) : '', esc(p.note || '')].filter(Boolean).join(' · ') || esc(t('Pin')),
-      (navStop ? act('stop', '＋ ' + t('Add as stop'), 'go') : nav ? '' : act('to', '➜ ' + t('Route here'), 'go')) +
+      (navStop ? act('stop', '＋ ' + t('Add as stop'), 'go') : nav ? '' : act('to', '➜ ' + t('Directions to here'), 'go')) +
       act('show', p.show ? '👁' : '🚫', 'ic ' + (p.show ? 'on' : ''), p.show ? t('Shown on map') : t('Hidden on map')) +
       act('edit', '✎', 'ic', t('Edit')) + act('del', '🗑', 'ic danger', t('Delete')))).join('');
   } else {

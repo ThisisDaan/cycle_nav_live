@@ -118,6 +118,8 @@ const NL = {
   'Route here': 'Route hierheen',
   'Go via here': 'Via dit punt',
   'Start from here': 'Start hier',
+  'Directions from here': 'Route vanaf hier',
+  'Directions to here': 'Route hierheen',
   'Remove this point': 'Dit punt verwijderen',
   'Hide points': 'Punten verbergen',
   'finding name…': 'naam zoeken…',
