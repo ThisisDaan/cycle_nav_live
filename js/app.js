@@ -1468,13 +1468,41 @@ function onNavFix(fix) {
   }
 }
 
+// After leaving the route, prefer a new route that carries on the way you're riding: people
+// often take their own way (a bit of footpath, a street they like). Only turn you around when
+// going forward is clearly worse.
+async function rerouteAhead(session, ahead) {
+  const bike = store.activeBike(), dest = resolve(session.dest), here = me.latlng;
+  const direct = await fetchRoute([here, ...ahead, dest], bike);
+  const course = session.course;
+  if (course == null || (me.speed ?? 3) < 1.5) return direct;
+  const turn = Math.abs(angleDelta(course, startBearing(direct.coords)));
+  if (turn < 100) return direct; // it already heads roughly your way
+  try {
+    // nudge the start ~60 m ahead in your direction of travel
+    const a = course * Math.PI / 180, m = 60;
+    const nudge = [here[0] + m * Math.cos(a) / 111320, here[1] + m * Math.sin(a) / (111320 * Math.cos(here[0] * Math.PI / 180))];
+    const fwd = await fetchRoute([here, nudge, ...ahead, dest], bike);
+    const okTurn = Math.abs(angleDelta(course, startBearing(fwd.coords))) < 100;
+    const extra = fwd.length - direct.length;
+    return okTurn && extra < Math.max(400, direct.length * 0.15) ? fwd : direct;
+  } catch { return direct; }
+}
+
+// direction of the first ~30 m of a route
+function startBearing(coords) {
+  let i = 1;
+  while (i < coords.length - 1 && dist(coords[0], coords[i]) < 30) i++;
+  return bearing(coords[0], coords[Math.min(i, coords.length - 1)]);
+}
+
 async function reroute(points) {
   nav.rerouting = true;
   const session = nav;
   try {
     // Keep the points you added that are still ahead of you.
     const ahead = points || session.vias.filter(v => alongRoute(session.route, v) > session.along + 30);
-    const route = await fetchRoute([me.latlng, ...ahead, resolve(session.dest)], store.activeBike());
+    const route = await rerouteAhead(session, ahead);
     session.vias = ahead;
     if (nav !== session) return;
     session.route = route;
