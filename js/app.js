@@ -13,6 +13,7 @@ import * as bnative from './brouter-native.js';
 import { bottomSheet } from './sheet.js';
 import { refreshOfflineSegments, routingMode } from './router.js';
 import { adviseHere, adviseRide } from './weather.js';
+import { createRainFx } from './rainfx.js';
 import { LANGUAGES, language, startTranslating, t } from './i18n.js';
 import { bearing, dist, fmtClock, fmtDist, fmtDuration, projectOnSegment, resample, simplify } from './geo.js';
 
@@ -1133,14 +1134,22 @@ function drawRoutes(onlySelected = false) {
 }
 
 // ---- live rain radar (RainViewer): the last two hours of radar, looped every few seconds
+// The radar tiles are only read as an intensity mask (js/rainfx.js); what you see is an illustrated rain effect.
 var radar = null;
 async function toggleRadar(on = !radar) {
   $('#radarBtn').classList.toggle('active', on);
   if (!on) {
-    clearInterval(radar?.timer); radar?.layers.forEach(l => l.remove()); radar = null;
+    clearInterval(radar?.timer); clearInterval(radar?.windTimer); radar?.fx.stop(); radar = null;
     $('#radarTime').hidden = true; return;
   }
-  radar = { layers: [], timer: null };
+  const fx = createRainFx(map, {
+    canvas: $('#rainFx'),
+    // screen px -> map container px, undoing the CSS rotation exactly like taps do
+    toContainer: (x, y) => map.mouseEventToContainerPoint({ clientX: x, clientY: y }),
+    getRotation: () => (framed() && !is3d() ? -mapRotation : 0),
+    isDark: () => document.documentElement.dataset.theme === 'dark',
+  });
+  radar = { fx, timer: null, windTimer: null };
   const mine = radar;
   let d;
   try { d = await (await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: AbortSignal.timeout(7000) })).json(); }
@@ -1148,12 +1157,18 @@ async function toggleRadar(on = !radar) {
   if (radar !== mine) return;
   const frames = d.radar.past.slice(-7);
   // every frame is its own layer, hidden until it is its turn, so the loop never waits for tiles
-  radar.layers = frames.map(f => L.tileLayer(`${d.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`, {
-    opacity: 0, maxNativeZoom: 7, maxZoom: 20, zIndex: 300, className: 'radar-tiles', attribution: 'RainViewer',
-  }).addTo(map));
+  frames.forEach(f => fx.addFrame(`${d.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`));
+  // wind for the streaks and gusts: current conditions where the map is looking (cached ~5 min by weather.js)
+  const loadWind = async () => {
+    const c = map.getCenter();
+    const a = await adviseHere([c.lat, c.lng]).catch(() => null);
+    if (radar === mine && a?.cur?.speed != null) fx.setWind({ speed: a.cur.speed, dir: a.cur.dir });
+  };
+  loadWind(); mine.windTimer = setInterval(loadWind, 300000);
+  fx.start();
   let i = frames.length - 1, pause = 0;
   const show = () => {
-    radar.layers.forEach((l, k) => l.setOpacity(k === i ? 0.6 : 0));
+    fx.show(i);
     const ago = Math.round((Date.now() / 1000 - frames[i].time) / 60);
     $('#radarTime').hidden = false;
     $('#radarTime').textContent = `${t('Rain radar')} · ${ago <= 10 ? t('now') : t('{0} ago', fmtDuration(ago * 60))}`;
