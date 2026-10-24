@@ -622,7 +622,9 @@ body.navigating #dlCard { bottom: auto; top: calc(130px + var(--safe-top)); }
 
 /* ---- sheet motion ---- */
 @keyframes sheet-in { from { transform: translateY(28px); opacity: 0; } }
-#sheet:not([hidden]), #navBar:not([hidden]) { animation: sheet-in .32s cubic-bezier(.2,.8,.2,1); }
+#sheet:not([hidden]), #navBar:not([hidden]), #placeSheet:not([hidden]) { animation: sheet-in .32s cubic-bezier(.2,.8,.2,1); }
+#placeSheet.leaving { animation: sheet-out .22s ease-in forwards; pointer-events: none; }
+@keyframes sheet-out { to { transform: translateY(40px); opacity: 0; } }
 .sheet, .nav-bar { touch-action: pan-y; }
 .sheeting, .settling { will-change: height; }
 .sheeting .route-status, .sheeting .route-card:not(.selected), .settling .route-status, .settling .route-card:not(.selected),
@@ -892,6 +894,9 @@ body.drawer-open #recenterBtn { display: none; }
 .pp-week { margin: 3px 0 0 22px; display: grid; gap: 1px; color: var(--muted); font-size: 12px; }
 .pp-week > div { display: flex; justify-content: space-between; gap: 10px; }
 .pp-week .pp-today { color: var(--text); font-weight: 700; }
+.pp-hours[open] .pp-week { animation: week-in .25s ease-out; transform-origin: top; }
+@keyframes week-in { from { opacity: 0; transform: translateY(-6px); max-height: 0; } to { max-height: 200px; } }
+@media (prefers-reduced-motion: reduce) { #placeSheet.leaving, .pp-hours[open] .pp-week { animation-duration: 1ms; } }
 
 /* tapped place card */
 #placeSheet { z-index: 1010; gap: 8px; padding-top: 14px; }

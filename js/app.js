@@ -477,16 +477,21 @@ function openPlaceSheet(latlng, name, sub, lookup) {
   const cached = lookup ? cachedPlace(name, latlng) : null;
   $('#placeBody').innerHTML = cached ? detailsHtml(cached.tags) : lookup ? `<small class="pp-loading">${esc(t('Loading details…'))}</small>` : '';
   render(cached?.tags);
+  $('#placeSheet').classList.remove('leaving');
   $('#placeSheet').hidden = false;
   if (lookup && !cached) lookupPlace(name, latlng).then(tags => {
     if (placeSel?.token !== token) return;
     $('#placeBody').innerHTML = detailsHtml(tags); render(tags);
+    $('#placeBody').animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
   }).catch(() => { if (placeSel?.token === token) $('#placeBody').innerHTML = ''; });
 }
 function closePlaceSheet() {
   if (!placeSel) return false;
   placeSel.marker.remove(); placeSel = null;
-  $('#placeSheet').hidden = true;
+  // slide out, then hide (unless another place opened it again meanwhile)
+  const el = $('#placeSheet');
+  el.classList.add('leaving');
+  setTimeout(() => { el.classList.remove('leaving'); if (!placeSel) el.hidden = true; }, 220);
   return true;
 }
 
