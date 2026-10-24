@@ -885,8 +885,9 @@ body.drawer-open #recenterBtn { display: none; }
 .pp-details a { color: var(--accent); text-decoration: none; }
 .pp-hours summary { display: flex; gap: 6px; align-items: baseline; cursor: pointer; list-style: none; }
 .pp-hours summary::-webkit-details-marker { display: none; }
-.pp-hours summary::after { content: '▾'; color: var(--muted); margin-left: auto; padding-left: 4px; }
-.pp-hours[open] summary::after { content: '▴'; }
+.pp-hours summary { align-items: center; }
+.pp-hours summary::after { content: attr(data-show) ' ▾'; margin-left: auto; flex: none; color: var(--accent); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pp-hours[open] summary::after { content: attr(data-hide) ' ▴'; }
 .pp-hours { display: block; }
 .pp-week { margin: 3px 0 0 22px; display: grid; gap: 1px; color: var(--muted); font-size: 12px; }
 .pp-week > div { display: flex; justify-content: space-between; gap: 10px; }

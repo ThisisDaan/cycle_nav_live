@@ -63,7 +63,7 @@ function hoursHtml(raw) {
   const status = formatStatus(hoursStatus(week), t);
   const today = (new Date().getDay() + 6) % 7;
   const rows = weekStrings(week, t('Closed')).map((s, i) => `<div class="${i === today ? 'pp-today' : ''}"><span>${esc(t(DAY_NAMES[i].slice(0, 3)))}</span><span>${esc(s === '24h' ? t('Open 24/7') : s)}</span></div>`).join('');
-  return `<details class="pp-row pp-hours"><summary><span class="pp-ic">🕒</span><span>${esc(status)}</span></summary><div class="pp-week">${rows}</div></details>`;
+  return `<details class="pp-row pp-hours"><summary data-show="${esc(t('All hours'))}" data-hide="${esc(t('Hide'))}"><span class="pp-ic">🕒</span><span>${esc(status)}</span></summary><div class="pp-week">${rows}</div></details>`;
 }
 
 // Call / website targets for the place sheet's buttons.
