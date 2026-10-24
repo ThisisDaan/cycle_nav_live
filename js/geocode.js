@@ -1,6 +1,7 @@
 // Place search via Photon (komoot), which is built on OpenStreetMap data.
 
 import { isOffline, nearestStreet, searchOffline } from './offline.js';
+import { dist } from './geo.js';
 
 const BASE = 'https://photon.komoot.io';
 
@@ -16,8 +17,9 @@ export async function search(query, near, signal) {
   const fallback = async () => searchOffline(query, near).catch(() => []);
   if (isOffline()) return fallback();
   try {
-    const params = new URLSearchParams({ q: query, limit: '6' });
-    if (near) { params.set('lat', near[0].toFixed(4)); params.set('lon', near[1].toFixed(4)); }
+    const params = new URLSearchParams({ q: query, limit: near ? '15' : '6' });
+    // lean hard on "near me": a street name exists in many towns, the one close by is almost always meant
+    if (near) params.set('lat', near[0].toFixed(4)), params.set('lon', near[1].toFixed(4)), params.set('zoom', '12'), params.set('location_bias_scale', '0.05');
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 8000);
     signal?.addEventListener('abort', () => ctl.abort());
@@ -25,10 +27,18 @@ export async function search(query, near, signal) {
     try { res = await fetch(`${BASE}/api/?${params}`, { signal: ctl.signal }); } finally { clearTimeout(timer); }
     if (!res.ok) throw new Error('Search failed');
     const json = await res.json();
-    return json.features.map(f => ({
+    const found = json.features.map((f, i) => ({
       ...label(f.properties),
       latlng: [f.geometry.coordinates[1], f.geometry.coordinates[0]],
+      rank: i,
     }));
+    if (!near) return found.map(({ rank, ...r }) => r);
+    // Photon's order, nudged by distance: each 10 km away counts like one place lower in the list
+    return found
+      .map(r => ({ r, score: r.rank + dist(near, r.latlng) / 10000 }))
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 6)
+      .map(({ r: { rank, ...r } }) => r);
   } catch (e) {
     if (signal?.aborted) throw e;
     const found = await fallback();
