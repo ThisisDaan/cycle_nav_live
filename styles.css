@@ -565,8 +565,6 @@ body.navigating #planner, body.navigating #mapButtons, body.navigating #sheet { 
 .emoji-choice { font-size: 22px; padding: 6px 10px; }
 .swatch { width: 38px; height: 38px; border-radius: 50%; border: 3px solid transparent; padding: 0; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
 .swatch.selected { border-color: var(--text); }
-.swatch-custom { position: relative; overflow: hidden; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
-.swatch-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .icon-choice { padding: 6px; border-radius: 16px; }
 .icon-choice svg { display: block; width: 24px; height: 24px; }
 .stat-row { display: flex; gap: 10px; }

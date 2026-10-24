@@ -2734,8 +2734,10 @@ function setActiveBike(id) {
   if (changed && to && !nav) planRoute();
 }
 
-// the theme accents plus 8 more, so bikes are easy to tell apart
+// the theme accents plus 8 more, so bikes are easy to tell apart; the accent picker uses the same set
 const BIKE_COLORS = [...ACCENTS, '#d93a3a', '#7cb518', '#1e6b45', '#23408e', '#b03aa8', '#8a5a33', '#8a949c', '#1b1f23'];
+const colorChoices = (current, key) => `<div class="choices">${BIKE_COLORS.map(c =>
+  `<button class="swatch ${c === current ? 'selected' : ''}" style="background:${c}" data-${key}="${c}" aria-label="${c}"></button>`).join('')}</div>`;
 function editBike(bikeId) {
   const isNew = !bikeId;
   const bike = isNew ? newBike({ name: '', color: ACCENTS[S().bikes.length % ACCENTS.length] }) : { ...S().bikes.find(b => b.id === bikeId) };
@@ -2745,7 +2747,7 @@ function editBike(bikeId) {
       <h2>${isNew ? 'Add a bike' : 'Edit bike'}</h2>
       <label class="field"><span>Name</span><input type="text" id="bName" value="${esc(bike.name)}" placeholder="e.g. Gazelle, Road bike, Bakfiets"></label>
       <div class="field"><span>Icon</span><div class="choices">${BIKE_ICONS.map(i => `<button class="choice icon-choice ${i === (iconName(bike.icon) || bike.icon) ? 'selected' : ''}" data-icon="${i}" aria-label="${i}">${icon(i, 24)}</button>`).join('')}</div></div>
-      <div class="field"><span>Colour</span><div class="choices">${BIKE_COLORS.map(c => `<button class="swatch ${c === bike.color ? 'selected' : ''}" style="background:${c}" data-color="${c}" aria-label="${c}"></button>`).join('')}</div></div>
+      <div class="field"><span>Colour</span>${colorChoices(bike.color, 'color')}</div>
       <label class="field"><span>Type</span><select id="bType">${Object.entries(BIKE_TYPES).map(([k, t]) => `<option value="${k}" ${k === bike.type ? 'selected' : ''}>${t.label}</option>`).join('')}</select></label>
       <div class="field"><span>Route style</span><div class="choices">${Object.entries(ROUTE_STYLES).map(([k, s]) => `<button class="choice ${k === bike.style ? 'selected' : ''}" data-style="${k}">${s.label}<small>${s.desc}</small></button>`).join('')}</div></div>
       <label class="field"><span>Average speed (km/h)</span><input type="number" id="bSpeed" min="5" max="45" step="0.5" value="${bike.speed}"></label>
@@ -2834,8 +2836,7 @@ function lookTab() {
       <div class="choices">${['auto', 'light', 'dark'].map(m => `<button class="choice ${t.mode === m ? 'selected' : ''}" data-mode="${m}">${{ auto: 'Automatic', light: 'Light', dark: 'Dark' }[m]}</button>`).join('')}</div>
     </div>
     <div class="section"><h3>Accent colour</h3>
-      <div class="choices">${ACCENTS.map(c => `<button class="swatch ${c === t.accent ? 'selected' : ''}" style="background:${c}" data-accent="${c}" aria-label="${c}"></button>`).join('')}
-        <label class="swatch swatch-custom ${ACCENTS.includes(t.accent) ? '' : 'selected'}" title="Custom colour"><input type="color" id="accentPicker" value="${t.accent}"></label></div>
+      ${colorChoices(t.accent, 'accent')}
     </div>
     <div class="section"><h3>Map</h3>
       <label class="field"><select id="mapStyle">${Object.entries(MAP_STYLES).map(([k, s]) => `<option value="${k}" ${k === t.mapStyle ? 'selected' : ''}>${s.label}</option>`).join('')}</select></label>
@@ -2895,7 +2896,6 @@ function wireSettings(tab, body) {
   if (tab === 'look') {
     on('[data-mode]', 'onclick', e => setTheme({ mode: e.currentTarget.dataset.mode }));
     on('[data-accent]', 'onclick', e => setTheme({ accent: e.currentTarget.dataset.accent }));
-    on('#accentPicker', 'onchange', e => setTheme({ accent: e.target.value }));
     on('#mapStyle', 'onchange', e => setTheme({ mapStyle: e.target.value }));
     on('[data-marker]', 'onclick', e => setTheme({ marker: e.currentTarget.dataset.marker }));
     on('[data-icon-kind]', 'onclick', e => setTheme({ appIcon: e.currentTarget.dataset.iconKind }));
