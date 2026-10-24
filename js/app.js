@@ -452,7 +452,7 @@ function tapMap(e) {
 }
 
 // Tapped place as a bottom card, like Google Maps: details fill in once looked up, with
-// Directions / Call / Website buttons and smaller from / via / save actions.
+// Save / Call / Website / Directions buttons (Via too while a route is planned).
 var placeSel = null;
 function openPlaceSheet(latlng, name, sub, lookup) {
   if (nav) return;
@@ -466,13 +466,14 @@ function openPlaceSheet(latlng, name, sub, lookup) {
   const go = act => { closePlaceSheet(); if (act === 'via') addVia(latlng); else if (act === 'pin') editPin(null, { name, latlng }); else choosePlace(act, place); };
   const render = tags => {
     const l = placeLinks(tags);
-    $('#placeActions').innerHTML = (l.tel ? `<a class="secondary-btn place-link" href="${esc(l.tel)}">📞 ${esc(t('Call'))}</a>` : '')
+    const saved = (S().pins || []).some(p => dist(p.latlng, latlng) < 30);
+    $('#placeActions').innerHTML = `<button class="secondary-btn place-save${saved ? ' saved' : ''}" data-a="pin" title="${esc(t('Save as pin'))}" aria-label="${esc(t('Save as pin'))}">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG}</button>`
+      + (options.length ? `<button class="secondary-btn" data-a="via">${esc(t('Via'))}</button>` : '')
+      + (l.tel ? `<a class="secondary-btn place-link" href="${esc(l.tel)}">📞 ${esc(t('Call'))}</a>` : '')
       + (l.site ? `<a class="secondary-btn place-link" href="${esc(l.site)}" target="_blank" rel="noopener noreferrer">🌐 ${esc(t('Website'))}</a>` : '')
       + `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
-    $('#placeActions [data-a]').onclick = () => go('to');
+    $('#placeActions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => go(b.dataset.a));
   };
-  $('#placeMore').innerHTML = `<button data-a="from">${esc(t('Directions from here'))}</button>${options.length ? `<button data-a="via">${esc(t('Go via here'))}</button>` : ''}<button data-a="pin">${BOOKMARK_SVG} ${esc(t('Save as pin'))}</button>`;
-  $('#placeMore').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.a));
   const cached = lookup ? cachedPlace(name, latlng) : null;
   $('#placeBody').innerHTML = cached ? detailsHtml(cached.tags) : lookup ? `<small class="pp-loading">${esc(t('Loading details…'))}</small>` : '';
   render(cached?.tags);
