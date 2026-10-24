@@ -457,15 +457,14 @@ function tapMap(e) {
 // Save / Call / Website / Directions buttons (Via too while a route is planned).
 var placeSel = null;
 function openPlaceSheet(latlng, name, sub, lookup, station = false) {
-  if (nav) return;
-  if (fol.mode && !fol.paused) pauseFollow();
+  if (!nav && fol.mode && !fol.paused) pauseFollow();
   map.closePopup();
   const place = { name, detail: sub || '', latlng }, token = {};
   placeSel?.marker.remove();
   placeSel = { token, marker: L.circleMarker(latlng, { radius: 9, color: '#fff', weight: 3, fillColor: S().theme.accent, fillOpacity: 1, interactive: false }).addTo(map) };
   $('#placeName').textContent = name;
   $('#placeType').textContent = sub || '';
-  const go = act => { closePlaceSheet(); if (act === 'via') addVia(latlng); else if (act === 'pin') editPin(null, { name, latlng }); else choosePlace(act, place); };
+  const go = act => { closePlaceSheet(); if (act === 'stop') addStop(place); else if (act === 'via') addVia(latlng); else if (act === 'pin') editPin(null, { name, latlng }); else choosePlace(act, place); };
   const render = tags => {
     const l = placeLinks(tags);
     const saved = (S().pins || []).some(p => dist(p.latlng, latlng) < 30);
@@ -474,9 +473,10 @@ function openPlaceSheet(latlng, name, sub, lookup, station = false) {
     const links = [l.tel && [l.tel, icon('phone'), t('Call'), ''], l.site && [l.site, icon('language'), t('Website'), ext],
       (station || isStation(tags)) && [trainPlanner(name, latlng, tags?.['addr:country']), icon('train'), t('Train times'), ext]].filter(Boolean);
     $('#placeActions').innerHTML = `<div class="place-pills"><button class="place-pill${saved ? ' saved' : ''}" data-a="pin">${saved ? BOOKMARK_SVG : BOOKMARK_LINE_SVG} ${esc(t(saved ? 'Saved' : 'Save'))}</button>`
-      + (options.length ? `<button class="place-pill" data-a="via">${icon('add')} ${esc(t('Go via here'))}</button>` : '')
+      + (options.length && !nav ? `<button class="place-pill" data-a="via">${icon('add')} ${esc(t('Go via here'))}</button>` : '')
       + links.map(([href, ic, label, extra]) => `<a class="place-pill" href="${esc(href)}"${extra}>${ic} ${esc(label)}</a>`).join('')
-      + `</div><button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`;
+      // mid-ride the main action is a stop on the way, not a new trip
+      + `</div>${nav ? (nav.recordOnly ? '' : `<button class="primary-btn" data-a="stop">${esc(t('Add as stop'))}</button>`) : `<button class="primary-btn" data-a="to">${esc(t('Directions'))}</button>`}`;
     $('#placeActions').querySelectorAll('[data-a]').forEach(b => b.onclick = () => go(b.dataset.a));
   };
   const cat = lookup === true ? null : lookup || null, cached = lookup ? cachedPlace(name, latlng, cat) : null;
@@ -1367,7 +1367,12 @@ const NEARBY_AROUND = 1500, NEARBY_ROUTE = 150;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function setNearbyBtn() { $('#nearbyBtn').classList.toggle('active', !!nearby); }
+// the map column and the navigation column each have a Find nearby button; both open the same menu
+const nearbyBtn = () => $(nav ? '#navNearbyBtn' : '#nearbyBtn');
+function setNearbyBtn() { ['#nearbyBtn', '#navNearbyBtn'].forEach(b => $(b).classList.toggle('active', !!nearby)); }
+// the route to search along: the one being ridden, else the planned one
+const aheadText = m => m < 25 ? t('Right here') : t('{0} ahead', fmtDist(m));
+const nearbyRoute = () => nav ? (nav.recordOnly ? null : nav.route) : options[selected]?.route;
 
 function clearNearby(onlyRoute = false) {
   if (onlyRoute && nearby?.mode !== 'route') return;
@@ -1381,7 +1386,7 @@ function clearNearby(onlyRoute = false) {
 function hideNearbyMenu() {
   const menu = $('#nearbyMenu');
   if (menu.hidden || menu.classList.contains('leaving')) return false;
-  $('#nearbyBtn').setAttribute('aria-expanded', 'false');
+  ['#nearbyBtn', '#navNearbyBtn'].forEach(b => $(b).setAttribute('aria-expanded', 'false'));
   if (reduceMotion()) { menu.hidden = true; return true; }
   menu.classList.add('leaving');
   setTimeout(() => { if (menu.classList.contains('leaving')) { menu.hidden = true; menu.classList.remove('leaving'); } }, 160);
@@ -1396,9 +1401,9 @@ function toggleNearbyMenu() {
     + (nearby ? `<button role="menuitem" data-k="" class="nearby-clear">${icon('close', 22)}<span><b>${esc(t('Clear'))}</b></span></button>` : '');
   menu.classList.remove('leaving');
   menu.hidden = false;
-  const r = $('#nearbyBtn').getBoundingClientRect();
+  const r = nearbyBtn().getBoundingClientRect();
   menu.style.top = `${Math.max(8, Math.min(r.top, innerHeight - menu.offsetHeight - 12))}px`;
-  $('#nearbyBtn').setAttribute('aria-expanded', 'true');
+  nearbyBtn().setAttribute('aria-expanded', 'true');
   menu.querySelectorAll('button').forEach(b => b.onclick = () => { hideNearbyMenu(); b.dataset.k ? searchNearby(b.dataset.k) : clearNearby(); });
 }
 
@@ -1429,7 +1434,8 @@ async function nominatimBox(n, [w, s, e, nn]) {
 
 async function searchNearby(key) {
   if (nearby?.key === key) return clearNearby();
-  const n = NEARBY[key], route = options[selected]?.route;
+  const n = NEARBY[key], route = nearbyRoute();
+  const from = nav && route ? nav.along - 20 : 0; // while riding, only what's still ahead
   if (!navigator.onLine) return toast(t('Finding places nearby needs a connection'));
   clearNearby();
   const token = nearbyToken, mode = route ? 'route' : 'around';
@@ -1464,21 +1470,28 @@ async function searchNearby(key) {
         const r = projectOnSegment(ll, route.coords[i], route.coords[i + 1]);
         if (r.d < best.d) best = { d: r.d, m: route.cum[i] + r.t * (route.cum[i + 1] - route.cum[i]) };
       }
-      if (best.d <= NEARBY_ROUTE) found.push({ ll, m: best.m, name: x.name });
+      if (best.d <= NEARBY_ROUTE && best.m >= from) found.push({ ll, m: best.m, name: x.name });
     } else {
       const d = dist(ll, origin);
       if (d <= NEARBY_AROUND) found.push({ ll, m: d, name: x.name });
     }
   }
   found.sort((p, q) => p.m - q.m);
-  if (!found.length) { clearNearby(); toast(t('Nothing found nearby')); return; }
+  if (!found.length) { clearNearby(); toast(t(nav && route ? 'Nothing found ahead' : 'Nothing found nearby')); return; }
   const shown = found.slice(0, 40);
   shown.forEach((f, i) => {
-    const sub = route ? t('{0} along the route', fmtDist(f.m)) : t('{0} from here', fmtDist(f.m));
+    // worked out on tap, so "ahead" is still right after riding on
+    const where = () => nav && route ? aheadText(f.m - nav.along) : route ? t('{0} along the route', fmtDist(f.m)) : t('{0} from here', fmtDist(f.m));
     L.marker(f.ll, { icon: L.divIcon({ className: 'nearby-icon', html: `<span style="animation-delay:${Math.min(i, 12) * 30}ms">${icon(n.ic, 18)}</span>`, iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 200 })
-      .on('click', () => openPlaceSheet(f.ll, f.name || t(n.label), f.name ? `${t(n.label)} · ${sub}` : sub, f.name ? true : key === 'parking' ? 'bicycle_parking' : false))
+      .on('click', () => { const sub = where(); openPlaceSheet(f.ll, f.name || t(n.label), f.name ? `${t(n.label)} · ${sub}` : sub, f.name ? true : key === 'parking' ? 'bicycle_parking' : false); })
       .addTo(nearby.layer);
   });
+  if (nav) {
+    // don't pull the camera away mid-ride; just say how far the nearest one is
+    const near = route ? aheadText(shown[0].m - nav.along) : t('{0} from here', fmtDist(shown[0].m));
+    toast(shown.length === 1 ? t('One {0}: {1}', t(n.label).toLowerCase(), near.toLowerCase()) : t('{0} {1}, nearest: {2}', shown.length, t(n.many), near.toLowerCase()));
+    return;
+  }
   toast(shown.length === 1 ? t('One {0} nearby', t(n.label).toLowerCase()) : t('{0} {1} nearby', shown.length, t(n.many)));
   const pts = shown.map(f => f.ll);
   if (!route) pts.push(origin);
@@ -1839,6 +1852,7 @@ function setupButtons() {
   document.querySelectorAll('.lockBtn').forEach(b => b.onclick = lockScreen);
   $('#radarBtn').onclick = () => toggleRadar();
   $('#nearbyBtn').onclick = toggleNearbyMenu;
+  $('#navNearbyBtn').onclick = toggleNearbyMenu;
   $('#moreBtn').onclick = () => setMore(!moreOpen);
   $('#placeClose').onclick = closePlaceSheet;
   setupFullscreen();
