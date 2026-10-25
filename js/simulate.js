@@ -176,10 +176,14 @@ function placePad() {
   if (!pad) return;
   const land = landscapeMQ.matches;
   pad.classList.toggle('land', land);
+  // only panels that share the pad's strip of screen push it up (on wide screens the sheets float on the left)
   let bottom = 16;
-  if (!land) for (const id of ['sheet', 'navBar', 'placeSheet']) {
+  const pr = pad.getBoundingClientRect();
+  for (const id of ['sheet', 'navBar', 'placeSheet']) {
     const el = $(`#${id}`);
-    if (el && !el.hidden && el.offsetParent !== null) bottom = Math.max(bottom, innerHeight - el.getBoundingClientRect().top + 12);
+    if (!el || el.hidden || !el.getClientRects().length) continue; // (offsetParent is always null for fixed panels)
+    const r = el.getBoundingClientRect();
+    if (r.left < pr.right && r.right > pr.left) bottom = Math.max(bottom, innerHeight - r.top + 12);
   }
   pad.style.bottom = `${Math.round(bottom)}px`;
 }
