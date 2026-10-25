@@ -28,6 +28,10 @@ export const fol = { mode: 0, paused: false, resume: 1, heading: 2, course: null
 
 // ---------------------------------------------------------------- GPS & position marker
 
+// The movement simulator (simulate.js) feeds handleFix itself; while it is on, real GPS fixes are ignored.
+export let simulating = false;
+export function setSimulating(v) { simulating = v; }
+
 // var, not let: startGps runs from init() before the module reaches this line
 var gpsWatch = null, lastFixAt = 0, watchStartedAt = 0, fixErrorShown = false;
 export function startGps() {
@@ -46,7 +50,7 @@ function watchGps() {
   if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch);
   gpsWatch = navigator.geolocation.watchPosition(pos => {
     lastFixAt = Date.now();
-    if (nav?.sim) return; // the simulator is driving
+    if (nav?.sim || simulating) return; // a simulator is driving
     try { handleFix({
       latlng: [pos.coords.latitude, pos.coords.longitude],
       accuracy: pos.coords.accuracy,
@@ -83,7 +87,7 @@ export function handleFix(fix) {
   // Standing still, GPS wanders (indoors by tens of metres, with made-up speeds too): keep the arrow
   // put until we're clearly moving or the fix lands well outside the error circle. When the motion
   // sensor says the phone isn't moving at all, hold on much harder. A clearly sharper fix still wins.
-  if (!first) {
+  if (!first && !fix.sim) {
     const d = dist(me.latlng, fix.latlng), acc = fix.accuracy || 20, still = phoneStill();
     const moving = !still && fix.speed != null && fix.speed >= 1.5 && acc <= 25;
     const r = still ? Math.max(30, Math.min(80, acc * 1.5)) : Math.max(8, Math.min(50, acc));

@@ -14,7 +14,7 @@ import { clearNearby } from './nearby.js';
 import { from, pushUndo, resolve, setFrom, setTo, syncInputs, to, undo } from './planner.js';
 import { stopFollow } from './position.js';
 import { cells, reloadRides, rideList } from './rides.js';
-import { scheduleSession } from './session.js';
+import { packVias, scheduleSession, unpackVias } from './session.js';
 import { $, esc, S, toast } from './ui.js';
 import { showWxPop, wxAdvice, wxLine, wxUpdate } from './wxui.js';
 
@@ -41,6 +41,10 @@ let sheetCtl = null;
 
 export let restoreSel = null;       // route index to reselect after a restored plan
 export function setRestoreSel(v) { restoreSel = v; }
+// A saved route shown exactly as it was saved (no new trip to the router), as long as the start,
+// the end and the points you shaped it with are unchanged; any edit plans afresh.
+let pinned = null;                  // { key, route }
+const planKey = (a, b) => [a, ...vias, b].map(p => `${p[0].toFixed(5)},${p[1].toFixed(5)}`).join(';');
 export let resumeNav = null;        // saved ride waiting for its route before navigation restarts
 export function setResumeNav(v) { resumeNav = v; }
 
@@ -72,7 +76,9 @@ export async function planRoute({ fit = true } = {}) {
 
   const bike = store.activeBike();
   const list = [];
-  if (vias.length) {
+  if (pinned && pinned.key === planKey(a, b)) {
+    list.push({ route: pinned.route, kind: 'custom' });
+  } else if (vias.length) {
     // The user shaped the route by hand: one route through their points.
     let route;
     try {
@@ -152,12 +158,20 @@ export async function planRoute({ fit = true } = {}) {
 async function familiarRoute(a, b, bike) {
   const f = findFamiliar(rideList, a, b);
   if (!f) return null;
+  const exact = savedExact(f, a, b);
+  if (exact) return exact;
   try {
     const route = await fetchRoute([a, ...viaPointsFor(f.points), b], bike);
     route.ridden = f.count;
     route.saved = f.saved;
     return route;
   } catch { return null; }
+}
+// a saved route that starts and ends here is used exactly as saved
+function savedExact(f, a, b) {
+  const plan = f.ride?.plan;
+  if (!plan?.route || dist(plan.a, a) > 60 || dist(plan.b, b) > 60) return null;
+  return { ...plan.route, ridden: f.count, saved: true };
 }
 
 function selectRoute(i, fit = false) {
@@ -512,6 +526,7 @@ export function setSheetCollapsed(collapsed) {
 async function rememberRoute() {
   const o = options[selected];
   if (!o) return;
+  const a = resolve(from), b = resolve(to);
   const name = `${from.isMe ? 'My location' : from.name} → ${to.name}`;
   await store.rides.put({
     id: newRideId(),
@@ -523,12 +538,26 @@ async function rememberRoute() {
     movingTime: 0, // not a real ride: don't learn speed from it
     points: simplify(o.route.coords, 4).map(p => [+p[0].toFixed(6), +p[1].toFixed(6)]),
     source: 'planned',
+    // everything needed to bring back exactly this route, and to keep editing it
+    plan: { a, b, from: packPlace(from, a), to: packPlace(to, b), vias: packVias(vias), route: o.route },
   });
   await reloadRides();
-  vias = [];
-  gpxRoute = null;
+  // keep showing the route as it is: replanning here used to swap it for a rougher copy
+  pinned = { key: planKey(a, b), route: o.route };
   toast('Saved. Next time this shows up as “Your usual way”');
-  planRoute({ fit: false });
+}
+const packPlace = (p, ll) => p.isMe ? { name: t('Start'), detail: '', latlng: ll } : { name: p.name, detail: p.detail || '', latlng: ll };
+
+// "Ride it" on a saved route: put back its start, end and shaping points, and show the saved line.
+export async function openSavedPlan(ride) {
+  const p = ride.plan;
+  setFrom(p.from); setTo(p.to);
+  vias = unpackVias(p.vias);
+  gpxRoute = null;
+  pinned = { key: planKey(p.a, p.b), route: p.route };
+  syncInputs();
+  drawStart(p.a);
+  await planRoute();
 }
 
 export function setupSheet() {

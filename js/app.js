@@ -10,6 +10,7 @@ import { closePicker, picking, wireOffline, wirePicker } from './offlineui.js';
 import { closePlaceSheet } from './placesheet.js';
 import { hideSuggestions, setupPlanner, to } from './planner.js';
 import { startCompass, startGps } from './position.js';
+import { initSimulate } from './simulate.js';
 import { reloadRides } from './rides.js';
 import { setupSheet } from './routing-ui.js';
 import { restoreSession, saveNavSession, savePlanSession } from './session.js';
@@ -40,6 +41,7 @@ async function init() {
   setupWeather();
   renderBikeChip();
   startGps();
+  initSimulate();
   startCompass();
   await reloadRides();
   restoreSession();

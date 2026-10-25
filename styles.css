@@ -90,6 +90,15 @@ body.nav-3d #skyFog { display: block; }
 }
 input[type="search"]::-webkit-search-cancel-button { display: none; }
 .planner-row input::placeholder { color: var(--muted); }
+/* the From row folds away while it is just "My location" */
+.from-wrap { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows .25s cubic-bezier(.2,.8,.2,1), opacity .2s ease-out; }
+.from-wrap > .planner-row { min-height: 0; overflow: hidden; }
+.planner-rows.from-hidden .from-wrap { grid-template-rows: 0fr; opacity: 0; }
+#viaRows + .planner-row { transition: border-color .25s ease-out; }
+.planner-rows.from-hidden #viaRows + .planner-row { border-top-color: transparent; }
+.change-start { flex: none; border: 0; border-radius: 8px; background: transparent; color: var(--accent); font: inherit; font-size: 13px; font-weight: 700; padding: 8px 6px; white-space: nowrap; max-width: 0; opacity: 0; overflow: hidden; pointer-events: none; transition: max-width .25s cubic-bezier(.2,.8,.2,1), opacity .2s ease-out, padding .25s; }
+.planner-rows.from-hidden .change-start { max-width: 120px; opacity: 1; pointer-events: auto; }
+.planner-rows:not(.from-hidden) .change-start { padding-left: 0; padding-right: 0; }
 .pin { width: 12px; height: 12px; border-radius: 50%; flex: none; }
 .pin-start { border: 3px solid var(--accent); }
 .pin-end { background: var(--accent); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
@@ -697,7 +706,7 @@ body.navigating #dlCard { bottom: auto; top: calc(130px + var(--safe-top)); }
 .undo-bar button { border: 0; background: transparent; color: var(--accent); font: inherit; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; padding: 10px 12px; border-radius: 8px; filter: brightness(1.5); }
 body.navigating #undoBtn, body.navigating #undoBar, body.picking #undoBtn { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  #sheet, #navBar, #undoBtn, .undo-bar, .dtab { animation: none !important; transition: none !important; }
+  #sheet, #navBar, #undoBtn, .undo-bar, .dtab, .from-wrap, .change-start, #viaRows + .planner-row, #simPad, #simPad.leaving { animation: none !important; transition: none !important; }
 }
 
 /* ---- landscape (phone turned sideways): a left column holds the panels, the map fills the rest ---- */
@@ -967,3 +976,14 @@ body.drawer-open #recenterBtn { display: none; }
 .sact.ic { display: inline-grid; place-items: center; }
 .sact.ic .ic { vertical-align: 0; }
 .srow-ic .ic { vertical-align: 0; }
+
+/* ---- movement simulator pad ---- */
+#simPad { position: fixed; left: 12px; bottom: 16px; z-index: 1002; padding: 8px; display: flex; flex-direction: column; gap: 6px; width: 252px; user-select: none; -webkit-user-select: none; touch-action: none; transition: bottom .25s cubic-bezier(.2,.8,.2,1); animation: sheet-in .25s cubic-bezier(.2,.8,.2,1); }
+#simPad.leaving { opacity: 0; transform: translateY(16px); transition: opacity .2s ease-out, transform .2s ease-out; pointer-events: none; }
+#simPad.land { left: auto; right: 12px; }
+.sim-badge { align-self: flex-start; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+.sim-row { display: flex; gap: 6px; }
+.sim-row button { flex: 1; min-height: 44px; border: 0; border-radius: 10px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; font-weight: 700; padding: 0 6px; touch-action: none; transition: background .15s, transform .15s; }
+.sim-row button:active, .sim-row button.held { background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); transform: scale(.97); }
+.sim-row button.sim-go { flex: 1.4; background: color-mix(in srgb, var(--accent) 18%, var(--surface-2)); }
+.sim-row button.cruise { background: color-mix(in srgb, var(--accent) 40%, var(--surface-2)); }

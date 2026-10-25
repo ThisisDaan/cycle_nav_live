@@ -15,8 +15,8 @@ const SESSION_MAX_AGE = 6 * 3600 * 1000;
 
 let sessionTimer;
 const packPlace = p => p && (p.isMe ? { isMe: true } : { name: p.name, detail: p.detail, latlng: p.latlng });
-const packVias = list => list.map(v => ({ ll: [v[0], v[1]], gpx: v.gpx, name: v.name, city: v.city }));
-const unpackVias = list => (list || []).map(v => Object.assign([v.ll[0], v.ll[1]], { gpx: v.gpx, name: v.name, city: v.city }));
+export const packVias = list => list.map(v => ({ ll: [v[0], v[1]], gpx: v.gpx, name: v.name, city: v.city }));
+export const unpackVias = list => (list || []).map(v => Object.assign([v.ll[0], v.ll[1]], { gpx: v.gpx, name: v.name, city: v.city }));
 const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 export const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
 

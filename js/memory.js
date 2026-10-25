@@ -54,7 +54,7 @@ export function findFamiliar(rideList, from, to) {
     const score = agree.length + c.ride.startedAt / 1e14; // tie-break: most recent
     if (!best || score > best.score) best = { ...c, score, count: agree.length };
   }
-  return { points: best.points, count: best.count, lastRidden: best.ride.startedAt, saved: best.ride.source === 'planned' };
+  return { points: best.points, count: best.count, lastRidden: best.ride.startedAt, saved: best.ride.source === 'planned', ride: best.ride };
 }
 
 // Via points that make the router follow a remembered track.

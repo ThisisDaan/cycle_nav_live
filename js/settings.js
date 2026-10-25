@@ -12,6 +12,7 @@ import { ORIENTATIONS, setNavFrame, setTiles, syncGL } from './mapview.js';
 import { nav } from './navigation.js';
 import { renderOffline } from './offlineui.js';
 import { drawMe } from './position.js';
+import { setSimulate } from './simulate.js';
 import { pickGpxRoute, reloadRides, rideLayer, rideList, showRiddenRoads } from './rides.js';
 import { drawRoutes, options } from './routing-ui.js';
 import { $, askConfirm, esc, pickFiles, S, toast } from './ui.js';
@@ -80,6 +81,8 @@ function moreTab() {
       <label class="toggle"><span>${t('Bike essentials on the map')}</span><input type="checkbox" id="optBikePois" ${S().bikePois !== false ? 'checked' : ''}></label>
       <label class="toggle"><span>Demo mode (simulate riding the route)</span><input type="checkbox" id="optDemo" ${S().demo ? 'checked' : ''}></label>
       <p class="hint">Demo mode lets you try navigation at your desk. Simulated rides can still be saved, so discard them.</p>
+      <label class="toggle"><span>Simulate my position (for testing)</span><input type="checkbox" id="optSim" ${S().simulate ? 'checked' : ''}></label>
+      <p class="hint">Real GPS is switched off and you steer yourself with a control pad (keys on a computer: W or arrow up to move, A and D or left and right to turn, S or space to stop). Long-press or right-click the map to jump there. Turns off Demo mode.</p>
     </div>
     <div class="section"><h3>Memory</h3>
       <div class="stat-row"><div><b>${rideList.length}</b><span>rides</span></div><div><b>${km.toFixed(km < 100 ? 1 : 0)}</b><span>km remembered</span></div></div>
@@ -128,7 +131,15 @@ function wireSettings(tab, body) {
     on('#optWx', 'onchange', e => { store.update(s => { s.wx = e.target.checked; }); wxUpdate(); });
     on('#optBikePois', 'onchange', e => { store.update(s => { s.bikePois = e.target.checked; }); syncGL(); });
     on('#optView3d', 'onchange', e => { store.update(s => { s.view3d = e.target.checked; }); if (nav) setNavFrame(true); else syncGL(); });
-    on('#optDemo', 'onchange', e => store.update(s => { s.demo = e.target.checked; }));
+    on('#optDemo', 'onchange', e => {
+      store.update(s => { s.demo = e.target.checked; if (s.demo) s.simulate = false; });
+      if (e.target.checked) { setSimulate(false); body.querySelector('#optSim').checked = false; }
+    });
+    on('#optSim', 'onchange', e => {
+      store.update(s => { s.simulate = e.target.checked; if (s.simulate) s.demo = false; });
+      if (e.target.checked) body.querySelector('#optDemo').checked = false;
+      setSimulate(e.target.checked);
+    });
     on('[data-lang]', 'onclick', e => {
       const lang = e.currentTarget.dataset.lang;
       if (lang === language()) return;

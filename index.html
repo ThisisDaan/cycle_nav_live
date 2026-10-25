@@ -23,16 +23,19 @@
   <section id="planner" class="card">
     <button id="savedBtn" title="Saved" aria-label="Saved"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg></button>
     <div class="planner-body">
-      <div class="planner-rows">
-        <div class="planner-row">
-          <span class="pin pin-start"></span>
-          <input id="fromInput" type="search" placeholder="My location" autocomplete="off" enterkeyhint="search">
-          <button id="swapBtn" class="icon-btn" title="Swap start and destination" aria-label="Swap"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg></button>
+      <div class="planner-rows from-hidden" id="plannerRows">
+        <div class="from-wrap" id="fromWrap" inert>
+          <div class="planner-row" id="fromRow">
+            <span class="pin pin-start"></span>
+            <input id="fromInput" type="search" placeholder="My location" autocomplete="off" enterkeyhint="search">
+            <button id="swapBtn" class="icon-btn" title="Swap start and destination" aria-label="Swap"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"/></svg></button>
+          </div>
         </div>
         <div id="viaRows"></div>
         <div class="planner-row">
           <span class="pin pin-end"></span>
           <input id="toInput" type="search" placeholder="Where to?" autocomplete="off" enterkeyhint="search">
+          <button id="changeStartBtn" class="change-start" type="button">Change start</button>
           <button id="clearBtn" class="icon-btn" title="Clear route" aria-label="Clear"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
         </div>
       </div>

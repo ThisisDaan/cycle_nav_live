@@ -42,6 +42,7 @@ const DEFAULTS = () => {
     lang: null,            // null = follow the phone's language
     orientation: 'course', // map while navigating: 'course' (riding direction), 'north' or 'compass'
     demo: false,
+    simulate: false,       // move my position by hand (simulate.js) instead of using GPS
     recent: [],
     pins: [],              // saved places: { id, name, emoji, note, latlng, show }
     view: null,

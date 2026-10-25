@@ -8,6 +8,7 @@ import { addStop, nav } from './navigation.js';
 import { picking } from './offlineui.js';
 import { deletePin, editPin, openPinPopup, pinIcon, renderPins } from './pins.js';
 import { choosePlace } from './planner.js';
+import { openSavedPlan } from './routing-ui.js';
 import { me } from './position.js';
 import { followTrack, importGpx, pickGpxRoute, reloadRides, rideList, toGpx } from './rides.js';
 import { currentTab, openSettings } from './settings.js';
@@ -142,7 +143,7 @@ async function drawerAction(id, a) {
     else if (a === 'del') deletePin(id);
   } else if (ride) {
     if (a === 'open') { if (nav) return toast('Finish this ride first'); closeDrawer(); previewRide(ride); }
-    else if (a === 'ride') { closeDrawer(); await followTrack(ride.points.map(p => [p[0], p[1]]), ride.name || t('Ride')); }
+    else if (a === 'ride') { closeDrawer(); if (ride.plan?.route) await openSavedPlan(ride); else await followTrack(ride.points.map(p => [p[0], p[1]]), ride.name || t('Ride')); }
     else if (a === 'rename') {
       const name = await askText(t('Rename'), { value: ride.name || '', placeholder: t('Ride'), ok: 'Save' });
       if (name == null) return;

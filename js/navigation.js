@@ -110,6 +110,7 @@ export function startNavigation(option, resume) {
     recorder: new Recorder(),
     dest: to,
     vias: vias.slice(),
+    gpx: vias.some(v => v.gpx), // following a GPX track: rerouting goes back to the track
     along: 0,
     follow: true,
     speedKmh: bikeSpeed(bike, rideList).kmh,
@@ -121,7 +122,7 @@ export function startNavigation(option, resume) {
   drawRoutes(true);
   viaLayer.clearLayers();
   enterNavUi(false);
-  if (S().demo) {
+  if (S().demo && !S().simulate) {
     toast('Demo mode: simulating your ride');
     nav.sim = new Simulator(option.route, nav.speedKmh, handleFix);
   } else if (me) {
@@ -251,24 +252,42 @@ async function rerouteAhead(session, ahead) {
   } catch { return direct; }
 }
 
-// Where to get back onto the route you chose: the closest point still ahead on it, favouring points in
-// your riding direction and not skipping big chunks, then guide points every ~400 m so the router keeps
-// to the rest of it. Returns [{ p, a }] with a = distance along the old route.
-function rejoinPlan(session) {
+// Where to get back onto the route you chose. Following a GPX track: the closest point still ahead
+// on it, even if that means turning round (keeping to the track is the point). Otherwise the router
+// is asked for a few ways back in (that closest point and points further along the route) and the
+// one that gets you to the destination soonest wins, with a U-turn counted as a detour, so when the
+// route comes back to you further ahead you carry on instead of going back for it.
+// Then guide points every ~400 m so the router keeps to the rest of it. Returns [{ p, a }] with
+// a = distance along the old route.
+async function rejoinPlan(session) {
   const r = session.route, here = me.latlng, course = session.course, end = r.cum[r.cum.length - 1];
-  let i = 0;
-  while (i < r.cum.length - 1 && r.cum[i] < session.along + 40) i++;
-  let best = null;
-  for (; i < r.coords.length && end - r.cum[i] > 150; i++) {
-    const d = dist(here, r.coords[i]);
-    let cost = d + (r.cum[i] - session.along) * 0.15;
-    if (course != null && d > 40 && Math.abs(angleDelta(course, bearing(here, r.coords[i]))) > 100) cost *= 1.6;
-    if (!best || cost < best.cost) best = { cost, i };
+  let i0 = 0;
+  while (i0 < r.cum.length - 1 && r.cum[i0] < session.along + 40) i0++;
+  let near = null;
+  for (let i = i0; i < r.coords.length && end - r.cum[i] > 150; i++) {
+    const cost = dist(here, r.coords[i]) + (r.cum[i] - session.along) * 0.15;
+    if (!near || cost < near.cost) near = { cost, i };
   }
-  if (!best) return [];
-  const a0 = r.cum[best.i], len = end - a0, n = Math.floor(len / 400), step = len / (n + 1);
-  const guides = n > 0 ? resample(r.coords.slice(best.i), step).slice(1, n + 1) : [];
-  return [r.coords[best.i], ...guides].map((p, k) => ({ p: [p[0], p[1]], a: a0 + k * step }));
+  if (!near) return [];
+  let pick = near.i;
+  if (!session.gpx) {
+    const at = m => { let i = i0; while (i < r.cum.length - 1 && r.cum[i] < session.along + m) i++; return i; };
+    const cands = [...new Set([near.i, ...[250, 500, 900, 1500].map(at)])]
+      .filter(i => end - r.cum[i] > 150 && dist(here, r.coords[i]) < 2500);
+    const bike = store.activeBike();
+    const legs = await Promise.all(cands.map(i => fetchRoute([here, r.coords[i]], bike).then(leg => ({ i, leg }), () => null)));
+    let best = null;
+    for (const c of legs) {
+      if (!c) continue;
+      const turnBack = course != null && (me.speed ?? 3) >= 1.5 && Math.abs(angleDelta(course, startBearing(c.leg.coords))) > 120;
+      const cost = c.leg.length + (end - r.cum[c.i]) + (turnBack ? 300 : 0);
+      if (!best || cost < best.cost) best = { cost, i: c.i };
+    }
+    if (best) pick = best.i;
+  }
+  const a0 = r.cum[pick], len = end - a0, n = Math.floor(len / 400), step = len / (n + 1);
+  const guides = n > 0 ? resample(r.coords.slice(pick), step).slice(1, n + 1) : [];
+  return [r.coords[pick], ...guides].map((p, k) => ({ p: [p[0], p[1]], a: a0 + k * step }));
 }
 
 // direction of the first ~30 m of a route
@@ -287,7 +306,8 @@ async function reroute(points) {
     let ahead = vias;
     if (!points) {
       // and steer back onto the route you chose instead of planning a brand new one
-      const guide = rejoinPlan(session);
+      const guide = await rejoinPlan(session);
+      if (nav !== session) return;
       if (guide.length) ahead = [...guide, ...vias.map(v => ({ p: v, a: alongRoute(session.route, v) }))].sort((x, y) => x.a - y.a).map(x => x.p);
     }
     const route = await rerouteAhead(session, ahead);

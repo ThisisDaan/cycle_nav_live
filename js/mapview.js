@@ -9,7 +9,7 @@ import { defaultPickRect, layoutPick, picking, schedulePick, setPickRect } from 
 import { renderPins, setPinLayer } from './pins.js';
 import { dropPin, setLastCtx, tapMap } from './placesheet.js';
 import { hideSuggestions } from './planner.js';
-import { angleDelta, currentHeading, fol, folHeading, me, meGlide, pauseFollow, planRecenter, setFollow, stopFollow } from './position.js';
+import { angleDelta, currentHeading, fol, folHeading, me, meGlide, pauseFollow, planRecenter, setFollow, simulating, stopFollow } from './position.js';
 import { options, setRouteLayer, setSheetCollapsed, setViaLayer } from './routing-ui.js';
 import { $, locked, S } from './ui.js';
 
@@ -128,7 +128,7 @@ export function setupMap() {
   addEventListener('mousedown', e => { if (e.target.closest?.('#map')) fol.touched = Date.now(); }, true);
   setupTwist();
   map.on('click', e => { hideSuggestions(); $('#bikeMenu').hidden = true; hideNearbyMenu(); setMore(false); tapMap(e); });
-  map.on('contextmenu', e => { setLastCtx(Date.now()); if (!picking) dropPin([e.latlng.lat, e.latlng.lng]); });
+  map.on('contextmenu', e => { setLastCtx(Date.now()); if (!picking && !simulating) dropPin([e.latlng.lat, e.latlng.lng]); });
 }
 
 export async function setTiles() {

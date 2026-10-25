@@ -25,6 +25,12 @@ export function setupPlanner() {
     const r = $('#planner').getBoundingClientRect();
     document.documentElement.style.setProperty('--planner-bottom', `${Math.round(r.bottom + 12)}px`);
   }).observe($('#planner'));
+  // The From row stays folded away while it is just "My location"; it opens with a route, a custom
+  // start, or on request, and folds again once the route is cleared.
+  new MutationObserver(updateFromRow).observe($('#sheet'), { attributes: true, attributeFilter: ['hidden'] });
+  $('#changeStartBtn').onclick = () => { fromAsked = true; updateFromRow(); $('#fromInput').focus({ preventScroll: true }); };
+  $('#fromInput').addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('#fromInput')) { fromAsked = false; updateFromRow(); } }, 150));
+  updateFromRow();
   for (const which of ['from', 'to']) {
     const input = $(`#${which}Input`);
     let timer, abort;
@@ -75,6 +81,7 @@ export function setupPlanner() {
     from = ME; to = null;
     syncInputs();
     clearRoutes();
+    updateFromRow();
   };
 }
 
@@ -137,9 +144,17 @@ export function choosePlace(which, place) {
   if (ll && !(to && resolve(from) && resolve(to))) map.flyTo(ll, Math.max(map.getZoom(), 15), { duration: 0.8 });
 }
 
+let fromAsked = false;
+function updateFromRow() {
+  const show = fromAsked || !from.isMe || !!to || !$('#sheet').hidden;
+  $('#plannerRows').classList.toggle('from-hidden', !show);
+  $('#fromWrap').inert = !show;
+}
+
 export function syncInputs() {
   $('#fromInput').value = from?.isMe ? '' : from?.name || '';
   $('#toInput').value = to ? (to.isMe ? t('My location') : to.name) : '';
+  updateFromRow();
 }
 
 export function resolve(place) { return place?.isMe ? me?.latlng : place?.latlng; }
