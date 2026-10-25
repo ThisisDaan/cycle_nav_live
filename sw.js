@@ -1,8 +1,8 @@
 // Network-first cache of the app shell so Cycle Nav still opens with a bad connection.
 
-const CACHE = 'cyclenav-v87';
+const CACHE = 'cyclenav-v88';
 const SHELL = ['./', 'index.html', 'styles.css', 'js/icons.js', 'manifest.webmanifest', 'icons/icon.svg', 'profiles/calm.brf', 'profiles/nostops.brf',
-  'js/app.js', 'js/native.js', 'js/geo.js', 'js/geocode.js', 'js/memory.js', 'js/nav.js', 'js/router.js', 'js/store.js', 'js/theme.js', 'js/mapstyle.js', 'js/i18n.js', 'js/offline.js', 'js/weather.js', 'js/brouter-native.js', 'js/sheet.js', 'js/rainfx.js', 'js/hours.js', 'js/placeinfo.js',
+  'js/app.js', 'js/ui.js', 'js/session.js', 'js/mapview.js', 'js/placesheet.js', 'js/position.js', 'js/planner.js', 'js/routing-ui.js', 'js/wxui.js', 'js/nearby.js', 'js/navigation.js', 'js/pins.js', 'js/rides.js', 'js/bikes.js', 'js/settings.js', 'js/drawer.js', 'js/offlineui.js', 'js/native.js', 'js/geo.js', 'js/geocode.js', 'js/memory.js', 'js/nav.js', 'js/router.js', 'js/store.js', 'js/theme.js', 'js/mapstyle.js', 'js/i18n.js', 'js/offline.js', 'js/weather.js', 'js/brouter-native.js', 'js/sheet.js', 'js/rainfx.js', 'js/hours.js', 'js/placeinfo.js',
   'vendor/pbf.js', 'vendor/vector-tile.js', 'vendor/point-geometry.js',
   'vendor/leaflet.js', 'vendor/leaflet.css', 'vendor/maplibre-gl.js', 'vendor/maplibre-gl.css', 'vendor/leaflet-maplibre-gl.js'];
 
