@@ -17,6 +17,7 @@ const SEG_BYTES = 180e6;
 export async function renderOffline() {
   const box = $('#offlineBox');
   if (!box) return;
+  if (!box.innerHTML) box.innerHTML = `<p class="hint" style="margin-top:0">${t('Loading…')}</p>`;
   const regions = await offline.listRegions().catch(() => []);
   const segs = bnative.available() ? await bnative.listSegments().catch(() => []) : [];
   if (!$('#offlineBox')) return;
@@ -45,7 +46,9 @@ export async function renderOffline() {
   on('[data-off-refresh]', async e => {
     const r = regions.find(x => x.id === e.currentTarget.dataset.offRefresh);
     if (!r) return;
-    await offline.deleteRegion(r.id);
+    // the old tiles must really be gone first, or the refresh would just reuse them
+    toast(t('Removing the old map…'));
+    await offline.deleteRegion(r.id); await offline.sweepOrphans();
     startOfflineDownload(r.bounds, r.name);
   });
   on('[data-seg-del]', async e => {

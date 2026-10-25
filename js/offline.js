@@ -380,34 +380,60 @@ export async function listRegions() {
 const inRange = (rs, z, x, y) => { const r = rs[z]; return x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1; };
 
 // Removes a region; tiles and places shared with other regions are kept.
+// The record goes first in its own tiny transaction, so the list updates at once; the tiles and
+// search entries are then cleaned up in small batches (one giant transaction used to lock the whole
+// database, and with it the map, the list and new downloads, for minutes).
 export async function deleteRegion(id) {
-  const all = await getAll('regions');
-  const reg = all.find(r => r.id === id);
-  if (!reg) return;
-  const others = all.filter(r => r.id !== id).map(r => ranges(r.bounds));
-  const mine = ranges(reg.bounds);
-  const d = await db();
-  await new Promise((res, rej) => {
-    const t = d.transaction(['tiles', 'places', 'regions'], 'readwrite');
-    const ts = t.objectStore('tiles');
-    for (const r of mine) for (let x = r.x0; x <= r.x1; x++) for (let y = r.y0; y <= r.y1; y++) {
-      if (!others.some(o => inRange(o, r.z, x, y))) ts.delete(`${r.z}/${x}/${y}`);
-    }
-    const c = t.objectStore('places').openCursor();
-    c.onsuccess = () => {
-      const cur = c.result;
-      if (!cur) return;
-      const v = cur.value;
-      if (v.r.includes(id)) {
-        v.r = v.r.filter(x => x !== id);
-        if (v.r.length) cur.update(v); else cur.delete();
-      }
-      cur.continue();
-    };
-    t.objectStore('regions').delete(id);
-    t.oncomplete = res; t.onerror = t.onabort = () => rej(t.error);
-  });
+  await tx('regions', 'readwrite', s => wrap(s.delete(id)));
   placeCache = null;
+  sweepOrphans();
+}
+
+// Deletes tiles and search entries that no remaining region covers. Also mops up after a delete
+// that was interrupted (app closed mid-cleanup). Runs in batches; safe to call any time.
+let sweeping = null;
+const active = new Set(); // tile ranges of downloads in progress: never swept
+export function sweepOrphans() {
+  return sweeping ||= (async () => {
+    try {
+      const regs = await getAll('regions');
+      const ids = new Set(regs.map(r => r.id));
+      const rs = regs.map(r => ranges(r.bounds));
+      const covered = key => { const [z, x, y] = key.split('/').map(Number); return rs.some(r => inRange(r, z, x, y)) || [...active].some(r => inRange(r, z, x, y)); };
+      const d = await db();
+      const batch = (store, fn) => new Promise((res, rej) => {
+        const t = d.transaction(store, 'readwrite');
+        const out = fn(t.objectStore(store));
+        t.oncomplete = () => res(out); t.onerror = t.onabort = () => rej(t.error);
+      });
+      // tiles: walk the stored keys 2000 at a time
+      let after = null;
+      for (;;) {
+        const keys = await tx('tiles', 'readonly', s => wrap(s.getAllKeys(after == null ? null : IDBKeyRange.lowerBound(after, true), 2000)));
+        if (!keys.length) break;
+        const gone = keys.filter(k => !covered(k));
+        if (gone.length) await batch('tiles', s => gone.forEach(k => s.delete(k)));
+        after = keys[keys.length - 1];
+        await new Promise(r => setTimeout(r, 0)); // let map tile reads in between batches
+      }
+      // places: drop references to regions that no longer exist
+      after = null;
+      for (;;) {
+        const range = after == null ? null : IDBKeyRange.lowerBound(after, true);
+        const [keys, vals] = await tx('places', 'readonly', s => Promise.all([wrap(s.getAllKeys(range, 1000)), wrap(s.getAll(range, 1000))]));
+        if (!keys.length) break;
+        const changes = [];
+        keys.forEach((k, i) => {
+          const r = vals[i].r.filter(x => ids.has(x));
+          if (r.length !== vals[i].r.length) changes.push([k, r.length ? { ...vals[i], r } : null]);
+        });
+        if (changes.length) await batch('places', s => changes.forEach(([k, v]) => v ? s.put(v, k) : s.delete(k)));
+        after = keys[keys.length - 1];
+        await new Promise(r => setTimeout(r, 0));
+      }
+      placeCache = null;
+    } finally { sweeping = null; }
+  })();
 }
 
 // Downloads every tile of the region (z0-14), fonts, sprites and builds the search index.
@@ -439,6 +465,7 @@ export function downloadRegion(name, bounds, onProgress = () => {}) {
       throw err;
     };
     const rs = ranges(b);
+    active.add(rs);
     const added = [];
     let bytes = 0;
     try {
@@ -513,6 +540,8 @@ export function downloadRegion(name, bounds, onProgress = () => {}) {
       // Roll back what this attempt added so a cancelled or failed download leaves nothing behind.
       if (added.length) await tx('tiles', 'readwrite', s => { added.forEach(k => s.delete(k)); }).catch(() => {});
       throw e;
+    } finally {
+      active.delete(rs);
     }
   }
 }

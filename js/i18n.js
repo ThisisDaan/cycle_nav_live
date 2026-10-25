@@ -97,6 +97,8 @@ const NL = {
   'Right here': 'Hier vlakbij',
   'One {0}: {1}': 'Eén {0}: {1}',
   '{0} {1}, nearest: {2}': '{0} {1}, dichtstbijzijnde: {2}',
+  'Loading…': 'Laden…',
+  'Removing the old map…': 'Oude kaart verwijderen…',
   'Add as stop': 'Toevoegen als stop',
   'No pins yet. Long-press the map, or tap the pin icon in a search result, to save a place.': 'Nog geen pinnen. Druk lang op de kaart of tik op het pin-icoon bij een zoekresultaat om een plek te bewaren.',
   'End this ride?': 'Rit beëindigen?',
